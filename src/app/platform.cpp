@@ -95,7 +95,7 @@ void Platform::dismissCrash()
 void Platform::applyAutostart(bool on)
 {
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/autostart";
-    const QString path = dir + "/io.github.gimbot.Gimbot.desktop";
+    const QString path = dir + "/io.github.Matt_B_007.Gimbot.desktop";
     if (!on) {
         QFile::remove(path);
         return;

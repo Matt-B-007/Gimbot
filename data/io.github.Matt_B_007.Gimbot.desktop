@@ -6,6 +6,6 @@ Comment=Control OBSBOT cameras: tracking, gimbal, zoom, presets and image settin
 Exec=gimbot
 Icon=gimbot
 Terminal=false
-Categories=AudioVideo;Video;Utility;
+Categories=AudioVideo;Video;
 Keywords=OBSBOT;Tiny;webcam;camera;gimbal;PTZ;tracking;
 StartupWMClass=gimbot

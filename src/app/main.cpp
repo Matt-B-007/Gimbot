@@ -29,7 +29,7 @@
 #define GIMBOT_REPO ""
 #endif
 
-static const char kService[] = "io.github.gimbot.Gimbot";
+static const char kService[] = "io.github.Matt_B_007.Gimbot";
 
 int main(int argc, char *argv[])
 {
@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("gimbot"));
     QApplication::setApplicationDisplayName(QStringLiteral("Gimbot"));
     QApplication::setApplicationVersion(QStringLiteral(GIMBOT_VERSION));
-    QApplication::setDesktopFileName(QStringLiteral("io.github.gimbot.Gimbot"));
+    QApplication::setDesktopFileName(QStringLiteral("io.github.Matt_B_007.Gimbot"));
     QApplication::setWindowIcon(QIcon::fromTheme("gimbot", QIcon(":/qt/qml/Gimbot/icons/gimbot.svg")));
     QApplication::setQuitOnLastWindowClosed(false); // keep running in the tray
 
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
     // One instance at a time: if Gimbot is already running, bring it forward.
     auto bus = QDBusConnection::sessionBus();
     if (!screenshotMode && bus.isConnected() && bus.interface()->isServiceRegistered(kService)) {
-        bus.call(QDBusMessage::createMethodCall(kService, "/Gimbot", "io.github.gimbot.Gimbot1", "Activate"));
+        bus.call(QDBusMessage::createMethodCall(kService, "/Gimbot", "io.github.Matt_B_007.Gimbot1", "Activate"));
         return 0;
     }
 

@@ -22,7 +22,7 @@
 
 using namespace std::chrono_literals;
 
-static const char kService[] = "io.github.gimbot.Gimbot";
+static const char kService[] = "io.github.Matt_B_007.Gimbot";
 
 static void usage()
 {
@@ -72,7 +72,7 @@ int main(int argc, char **argv)
         if (bus.isConnected() && bus.interface()->isServiceRegistered(kService)) {
             QStringList list;
             for (auto &a : args) list << QString::fromStdString(a);
-            auto msg = QDBusMessage::createMethodCall(kService, "/Gimbot", "io.github.gimbot.Gimbot1", "Run");
+            auto msg = QDBusMessage::createMethodCall(kService, "/Gimbot", "io.github.Matt_B_007.Gimbot1", "Run");
             msg << list;
             auto reply = bus.call(msg, QDBus::Block, 15000);
             if (reply.type() == QDBusMessage::ReplyMessage && reply.arguments().size() == 2) {

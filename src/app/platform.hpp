@@ -74,10 +74,10 @@ private:
     bool m_crashed = false;
 };
 
-// Exposed on the session bus as io.github.gimbot.Gimbot at /Gimbot.
+// Exposed on the session bus as io.github.Matt_B_007.Gimbot at /Gimbot.
 class DBusService : public QObject, protected QDBusContext {
     Q_OBJECT
-    Q_CLASSINFO("D-Bus Interface", "io.github.gimbot.Gimbot1")
+    Q_CLASSINFO("D-Bus Interface", "io.github.Matt_B_007.Gimbot1")
 public:
     DBusService(Controller *cam, Platform *platform, QObject *parent = nullptr);
 

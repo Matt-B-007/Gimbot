@@ -8,7 +8,7 @@ include(GNUInstallDirs)
 option(BUILD_GUI "Build the desktop app (otherwise only gimbotctl)" ON)
 option(WITH_KDE "Use KDE Frameworks for the tray, global shortcuts and crash reports when found" ON)
 set(GIMBOT_MIN_QT 6.8 CACHE STRING "Oldest Qt 6 version to accept")
-set(GIMBOT_REPO "" CACHE STRING "GitHub owner/repo, used for update checks and bug reports (e.g. alex/gimbot)")
+set(GIMBOT_REPO "Matt-B-007/Gimbot" CACHE STRING "GitHub owner/repo, used for update checks and bug reports (e.g. alex/gimbot)")
 set(OBSBOT_SDK_DIR "" CACHE PATH "Path to the extracted OBSBOT SDK (the folder containing include/ and linux/)")
 
 # ---------------------------------------------------------------- OBSBOT SDK
@@ -86,7 +86,7 @@ install(FILES data/60-obsbot.rules DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/udev/
 # The installer doubles as the updater the app runs ("Update now").
 file(READ install.sh _installer)
 if(GIMBOT_REPO)
-    string(REPLACE "DEFAULT_REPO=\"OWNER/gimbot\"" "DEFAULT_REPO=\"${GIMBOT_REPO}\"" _installer "${_installer}")
+    string(REGEX REPLACE "DEFAULT_REPO=\"[^\"]*\"" "DEFAULT_REPO=\"${GIMBOT_REPO}\"" _installer "${_installer}")
 endif()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/gimbot-update "${_installer}")
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/gimbot-update DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -156,12 +156,12 @@ if(BUILD_GUI)
     endif()
 
     install(TARGETS gimbot RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-    install(FILES data/io.github.gimbot.Gimbot.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
-    install(FILES data/io.github.gimbot.Gimbot.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+    install(FILES data/io.github.Matt_B_007.Gimbot.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES data/io.github.Matt_B_007.Gimbot.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
     install(FILES data/icons/gimbot.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
     install(FILES data/icons/gimbot-symbolic.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/symbolic/apps)
     install(DIRECTORY data/icons/hicolor/ DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor)
-    install(FILES data/io.github.gimbot.Gimbot.service DESTINATION ${CMAKE_INSTALL_DATADIR}/dbus-1/services)
+    install(FILES data/io.github.Matt_B_007.Gimbot.service DESTINATION ${CMAKE_INSTALL_DATADIR}/dbus-1/services)
 endif()
 
 # ---------------------------------------------------------------- tests
