@@ -12,6 +12,7 @@ Rectangle {
     signal openAbout()
     signal confirmFactoryReset()
     signal saveProfileRequested()
+    signal openUpdate()
 
     readonly property bool connected: cam.connected
     readonly property var v: cam.values
@@ -631,8 +632,9 @@ Rectangle {
                         SettingRow {
                             label: qsTr("Tell me about new versions")
                             description: !updater.configured ? qsTr("Not available in this build")
-                                        : root.v.updateChannel === 2 ? qsTr("Includes beta versions, which may have bugs")
-                                        : qsTr("Updates are installed by your package manager")
+                                        : root.v.updateChannel === 2 ? qsTr("Includes beta versions, which may have bugs. Switching back offers the newest normal version.")
+                                        : updater.canInstall ? qsTr("Gimbot installs updates for you with one click")
+                                        : qsTr("Update with your package manager")
                             Segmented {
                                 implicitWidth: 260
                                 stretch: true
@@ -650,7 +652,14 @@ Rectangle {
                                  : updater.state === "error" ? qsTr("Couldn't check for updates")
                                  : qsTr("Current version: %1").arg(platform.version)
                             description: updater.lastChecked.length > 0 ? qsTr("Last checked %1").arg(updater.lastChecked) : ""
-                            Btn { visible: updater.state === "available"; text: qsTr("What's new"); variant: "outline"; compact: true; onClicked: platform.openUrl(updater.latestUrl) }
+                            Btn {
+                                visible: updater.state === "available"
+                                text: updater.canInstall ? (updater.isSwitch ? qsTr("Switch now") : qsTr("Update now")) : qsTr("What's new")
+                                iconName: updater.canInstall ? "download" : "external"
+                                variant: updater.canInstall ? "primary" : "outline"
+                                compact: true
+                                onClicked: updater.canInstall ? root.openUpdate() : platform.openUrl(updater.latestUrl)
+                            }
                             Btn { text: qsTr("Check now"); iconName: "refresh"; compact: true; enabled: updater.state !== "checking"; onClicked: updater.check() }
                         }
 

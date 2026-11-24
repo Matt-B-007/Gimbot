@@ -40,6 +40,7 @@ ApplicationWindow {
     // Used by --screenshots to visit each screen.
     function showScreen(name) {
         palette.close(); report.close(); about.close()
+        if (name !== "updating" && name !== "updated") updateDialog.close()
         if (name.endsWith("-dark")) { cam.set("theme", 1); name = name.replace("-dark", "") }
         forceConnectScreen = name === "connect"
         const parts = name.split(":")
@@ -48,6 +49,8 @@ ApplicationWindow {
         if (name === "palette") palette.open()
         if (name === "report") report.open()
         if (name === "about") about.open()
+        if (name === "update") updateDialog.open()
+        if (name === "updating") updater.install()
     }
 
     onClosing: (close) => {
@@ -82,6 +85,7 @@ ApplicationWindow {
         onOpenPalette: palette.open()
         onOpenSettings: window.openSettings()
         onOpenReport: report.open()
+        onOpenUpdate: updateDialog.open()
         onSavePreset: { nameDialog.mode = "preset"; nameDialog.value = qsTr("Preset %1").arg(cam.presets.length + 1); nameDialog.open() }
         onRenamePreset: (id, name) => { nameDialog.mode = "rename"; nameDialog.targetId = id; nameDialog.value = name; nameDialog.open() }
         onDeletePreset: (id, name) => {
@@ -103,6 +107,7 @@ ApplicationWindow {
         onBack: window.page = "studio"
         onOpenReport: report.open()
         onOpenAbout: about.open()
+        onOpenUpdate: updateDialog.open()
         onSaveProfileRequested: { nameDialog.mode = "profile"; nameDialog.value = ""; nameDialog.open() }
         onConfirmFactoryReset: {
             confirm.title = qsTr("Reset the camera?")
@@ -149,6 +154,7 @@ ApplicationWindow {
                 { title: qsTr("Voice command settings"), icon: "mic", keywords: "audio", run: () => window.openSettings("voice") },
                 { title: qsTr("Profiles"), icon: "layers", run: () => window.openSettings("profiles") },
                 { title: qsTr("Check for updates"), icon: "download", run: () => { updater.check(); window.openSettings("app") } },
+                { title: updater.state === "available" && updater.canInstall ? qsTr("Install Gimbot %1").arg(updater.latestVersion) : "", icon: "download", run: () => updateDialog.open() },
                 { title: qsTr("Report a problem"), icon: "bug", keywords: "bug issue help", run: () => report.open() },
                 { title: qsTr("About Gimbot"), icon: "info", run: () => about.open() },
                 { title: qsTr("Quit Gimbot"), hint: "Ctrl Q", icon: "power", run: () => Qt.quit() }
@@ -161,11 +167,12 @@ ApplicationWindow {
                 const name = cam.profiles[j]
                 a.push({ title: qsTr("Apply profile: %1").arg(name), icon: "layers", run: () => cam.applyProfile(name) })
             }
-            return a
+            return a.filter(x => x.title.length > 0)
         }
     }
 
     ReportDialog { id: report; onDone: (m) => window.toast(m) }
+    UpdateDialog { id: updateDialog; onReportRequested: report.open() }
     AboutDialog { id: about }
     ConfirmDialog { id: confirm }
 

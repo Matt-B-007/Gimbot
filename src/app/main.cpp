@@ -109,6 +109,10 @@ int main(int argc, char *argv[])
     };
     QObject::connect(&cam, &Controller::appSettingChanged, &app, applyAppSetting);
     for (const char *k : {"verboseLogging", "updateChannel"}) applyAppSetting(k, cam.get(k));
+    if (simulated) { // pretend an update is out, to try the update screens
+        updater.setSimulated(true);
+        QTimer::singleShot(screenshotMode ? 500 : 3000, &updater, &Updater::check);
+    }
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("cam", &cam);
@@ -134,7 +138,7 @@ int main(int argc, char *argv[])
         QDir().mkpath(dir);
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         const QStringList steps = {"studio", "settings", "settings:image", "settings:app", "palette", "report",
-                                   "about",  "connect", "studio-dark", "settings:voice-dark", "settings:area-dark", "report-dark", "connect-dark"};
+                                   "about",  "connect", "studio-dark", "settings:voice-dark", "settings:area-dark", "report-dark", "connect-dark", "update", "updating", "updated"};
         auto index = std::make_shared<int>(0);
         auto *timer = new QTimer(&app);
         timer->setInterval(1400);

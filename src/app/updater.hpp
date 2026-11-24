@@ -1,10 +1,15 @@
-// Checks the project's GitHub releases for a newer Gimbot. It only tells the
-// user; the package manager (paru/yay, Discover) does the actual update.
-// Channel 1 = normal releases, 2 = also beta releases, 0 = never check.
+// Checks GitHub for a newer Gimbot and installs it.
+//
+// Checking reads the project's releases: channel 1 follows normal releases,
+// 2 also beta releases, 0 never checks. Installing runs gimbot-update (the
+// same script as the one-line installer), which builds the new version with
+// the user's saved OBSBOT SDK, then installs it through pacman with one
+// password prompt. Progress comes back as "::progress N message" lines.
 #pragma once
 
 #include <QNetworkAccessManager>
 #include <QObject>
+#include <QProcess>
 #include <QTimer>
 
 class Updater : public QObject {
@@ -15,7 +20,15 @@ class Updater : public QObject {
     Q_PROPERTY(QString latestUrl READ latestUrl NOTIFY changed)
     Q_PROPERTY(QString latestNotes READ latestNotes NOTIFY changed)
     Q_PROPERTY(bool latestIsBeta READ latestIsBeta NOTIFY changed)
+    Q_PROPERTY(bool isSwitch READ isSwitch NOTIFY changed) // going from a beta back to a normal release
     Q_PROPERTY(QString lastChecked READ lastChecked NOTIFY changed)
+
+    Q_PROPERTY(bool canInstall READ canInstall CONSTANT)
+    Q_PROPERTY(QString installState READ installState NOTIFY installChanged) // idle running done failed
+    Q_PROPERTY(int installProgress READ installProgress NOTIFY installChanged)
+    Q_PROPERTY(QString installStatus READ installStatus NOTIFY installChanged)
+    Q_PROPERTY(QString installError READ installError NOTIFY installChanged)
+    Q_PROPERTY(QString installLog READ installLog NOTIFY installChanged)
 
 public:
     Updater(const QString &repo, const QString &currentVersion, QObject *parent = nullptr);
@@ -26,24 +39,44 @@ public:
     QString latestUrl() const { return m_url; }
     QString latestNotes() const { return m_notes; }
     bool latestIsBeta() const { return m_beta; }
+    bool isSwitch() const { return m_switch; }
     QString lastChecked() const { return m_lastChecked; }
+
+    bool canInstall() const { return m_simulated || (!m_helper.isEmpty() && configured()); }
+    QString installState() const { return m_installState; }
+    int installProgress() const { return m_progress; }
+    QString installStatus() const { return m_status; }
+    QString installError() const { return m_error; }
+    QString installLog() const { return m_log; }
 
     void setChannel(int channel);
     Q_INVOKABLE void check();
+    Q_INVOKABLE void install();
+    Q_INVOKABLE void cancelInstall();
+    Q_INVOKABLE void restartApp();
+    // For testing the update screens: --fake runs a pretend update.
+    void setSimulated(bool on) { m_simulated = on; }
 
     // -1, 0, 1 like strcmp; understands "1.2.0-beta.3".
     static int compareVersions(const QString &a, const QString &b);
 
 signals:
     void changed();
+    void installChanged();
 
 private:
     void setState(const QString &s);
+    void readOutput();
 
     QNetworkAccessManager m_net;
     QTimer m_timer;
-    QString m_repo, m_current;
+    QString m_repo, m_current, m_helper;
     int m_channel = 1;
-    QString m_state = "idle", m_latest, m_url, m_notes, m_lastChecked;
-    bool m_beta = false;
+    QString m_state = "idle", m_latest, m_tag, m_url, m_notes, m_lastChecked;
+    bool m_beta = false, m_switch = false, m_simulated = false;
+
+    QProcess *m_proc = nullptr;
+    QString m_installState = "idle", m_status, m_error, m_log;
+    int m_progress = 0;
+    QByteArray m_partial;
 };

@@ -10,6 +10,7 @@ FocusScope {
     signal openPalette()
     signal openSettings()
     signal openReport()
+    signal openUpdate()
     signal savePreset()
     signal renamePreset(int id, string name)
     signal deletePreset(int id, string name)
@@ -72,12 +73,30 @@ FocusScope {
         }
         Banner {
             Layout.fillWidth: true
-            visible: updater.state === "available" && !root.updateDismissed
+            visible: (updater.state === "available" && !root.updateDismissed) || updater.installState !== "idle"
+            readonly property string install: updater.installState
+            tint: install === "done" ? Theme.success : install === "failed" ? Theme.danger : Theme.accent
             iconName: "download"
-            text: updater.latestIsBeta ? qsTr("Gimbot %1 (beta) is available. Update it with your package manager.").arg(updater.latestVersion)
-                                       : qsTr("Gimbot %1 is available. Update it with your package manager.").arg(updater.latestVersion)
-            actionText: qsTr("What's new")
-            onAction: platform.openUrl(updater.latestUrl)
+            text: {
+                if (install === "running") return qsTr("Updating to Gimbot %1… %2%").arg(updater.latestVersion).arg(updater.installProgress)
+                if (install === "done") return qsTr("Gimbot %1 is installed. Restart to start using it.").arg(updater.latestVersion)
+                if (install === "failed") return qsTr("The update didn't finish: %1").arg(updater.installError)
+                const name = updater.latestIsBeta ? qsTr("Gimbot %1 (beta)").arg(updater.latestVersion) : qsTr("Gimbot %1").arg(updater.latestVersion)
+                if (updater.isSwitch) return qsTr("%1, the newest normal version, is available.").arg(name)
+                return updater.canInstall ? qsTr("%1 is available.").arg(name)
+                                          : qsTr("%1 is available. Update it with your package manager.").arg(name)
+            }
+            secondaryText: install === "idle" && updater.canInstall ? qsTr("What's new") : ""
+            onSecondary: root.openUpdate()
+            actionText: install === "running" ? qsTr("Show")
+                      : install === "done" ? qsTr("Restart Gimbot")
+                      : install === "failed" ? qsTr("Details")
+                      : updater.canInstall ? (updater.isSwitch ? qsTr("Switch now") : qsTr("Update now")) : qsTr("What's new")
+            onAction: {
+                if (install === "done") updater.restartApp()
+                else if (updater.canInstall) root.openUpdate()
+                else platform.openUrl(updater.latestUrl)
+            }
             onDismissed: root.updateDismissed = true
         }
 

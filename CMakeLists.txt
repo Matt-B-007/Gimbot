@@ -83,6 +83,14 @@ install(TARGETS gimbotctl RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 install(FILES data/60-obsbot.rules DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/udev/rules.d)
 
+# The installer doubles as the updater the app runs ("Update now").
+file(READ install.sh _installer)
+if(GIMBOT_REPO)
+    string(REPLACE "DEFAULT_REPO=\"OWNER/gimbot\"" "DEFAULT_REPO=\"${GIMBOT_REPO}\"" _installer "${_installer}")
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/gimbot-update "${_installer}")
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/gimbot-update DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 # ---------------------------------------------------------------- desktop app
 if(BUILD_GUI)
     find_package(Qt6 ${GIMBOT_MIN_QT} REQUIRED COMPONENTS Gui Widgets Network Svg Qml Quick QuickControls2 Multimedia)
@@ -125,7 +133,7 @@ if(BUILD_GUI)
             qml/TopBar.qml qml/Preview.qml qml/PresetStrip.qml
             qml/AimCard.qml qml/TrackingCard.qml qml/ImageCard.qml qml/Banner.qml
             qml/CommandPalette.qml qml/ReportDialog.qml qml/AboutDialog.qml
-            qml/NameDialog.qml qml/ConfirmDialog.qml qml/Sheet.qml qml/Toasts.qml
+            qml/NameDialog.qml qml/ConfirmDialog.qml qml/UpdateDialog.qml qml/Sheet.qml qml/Toasts.qml
             qml/Icon.qml qml/Btn.qml qml/IconBtn.qml qml/Segmented.qml qml/Toggle.qml
             qml/SliderRow.qml qml/Select.qml qml/Card.qml qml/SettingRow.qml qml/Field.qml
             qml/Kbd.qml qml/StyledMenu.qml qml/AbstractButtonLike.qml
