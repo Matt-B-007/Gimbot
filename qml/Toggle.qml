@@ -1,0 +1,41 @@
+import QtQuick
+import QtQuick.Controls
+
+// On/off switch.
+Switch {
+    id: control
+    implicitWidth: 44
+    implicitHeight: 26
+    padding: 0
+    spacing: 0
+    focusPolicy: Qt.StrongFocus
+    hoverEnabled: true
+
+    indicator: Rectangle {
+        width: 44
+        height: 26
+        radius: 13
+        color: control.checked ? Theme.accent : (Theme.dark ? "#2c3035" : "#cfd3d9")
+        opacity: control.enabled ? 1 : 0.45
+        Behavior on color { ColorAnimation { duration: Theme.normal } }
+        Rectangle {
+            x: control.checked ? parent.width - width - 3 : 3
+            y: 3
+            width: 20
+            height: 20
+            radius: 10
+            color: control.checked ? Theme.accentInk : (Theme.dark ? "#c9ccd1" : "#ffffff")
+            Behavior on x { NumberAnimation { duration: Theme.normal; easing.type: Easing.OutCubic } }
+        }
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -3
+            radius: height / 2
+            color: "transparent"
+            border.width: 2
+            border.color: Theme.accentText
+            visible: control.visualFocus
+        }
+    }
+    contentItem: Item {}
+}

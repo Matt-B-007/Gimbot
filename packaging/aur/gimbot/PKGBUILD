@@ -1,0 +1,49 @@
+# Maintainer: Your Name <you@example.com>
+#
+# Gimbot needs OBSBOT's SDK, which OBSBOT emails to you on request and which
+# is not redistributed here. Put libdev_v2.1.0_8.zip next to this PKGBUILD
+# before running makepkg. (If OBSBOT's terms turn out to allow
+# redistribution, this can become a normal download instead.)
+
+pkgname=gimbot
+pkgver=0.1.0
+pkgrel=1
+_sdk=libdev_v2.1.0_8
+pkgdesc="Unofficial control app for OBSBOT Tiny 2 cameras (tracking, gimbal, presets, image settings)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/OWNER/gimbot"
+license=('MIT')
+depends=('qt6-base' 'qt6-declarative' 'qt6-multimedia' 'qt6-multimedia-ffmpeg' 'qt6-svg'
+         'kcoreaddons' 'kcrash' 'kglobalaccel' 'kstatusnotifieritem')
+makedepends=('cmake' 'extra-cmake-modules' 'unzip')
+provides=('gimbotctl')
+conflicts=('gimbot-beta')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz"
+        "$_sdk.zip")
+noextract=("$_sdk.zip")
+sha256sums=('SKIP'
+            'SKIP')
+
+prepare() {
+  rm -rf sdk && mkdir sdk
+  bsdtar -xf "$_sdk.zip" -C sdk
+}
+
+build() {
+  cmake -S "$pkgname-$pkgver" -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DBUILD_TESTING=ON \
+    -DGIMBOT_REPO="OWNER/gimbot" \
+    -DOBSBOT_SDK_DIR="$srcdir/sdk/$_sdk"
+  cmake --build build
+}
+
+check() {
+  ctest --test-dir build --output-on-failure
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+  install -Dm644 "$pkgname-$pkgver/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

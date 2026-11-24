@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Gimbot
+GenericName=Camera Control
+Comment=Control OBSBOT cameras: tracking, gimbal, zoom, presets and image settings
+Exec=gimbot
+Icon=gimbot
+Terminal=false
+Categories=AudioVideo;Video;Utility;
+Keywords=OBSBOT;Tiny;webcam;camera;gimbal;PTZ;tracking;
+StartupWMClass=gimbot

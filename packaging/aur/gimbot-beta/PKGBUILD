@@ -1,0 +1,49 @@
+# Maintainer: Your Name <you@example.com>
+#
+# Beta channel: built from the newest test release (tags like v0.2.0-beta.1).
+# Same SDK note as the gimbot package: put libdev_v2.1.0_8.zip next to this
+# file before running makepkg.
+
+pkgname=gimbot-beta
+_tag=v0.2.0-beta.1          # the release tag on GitHub
+pkgver=0.2.0beta1           # the same, without characters pacman doesn't allow
+pkgrel=1
+_sdk=libdev_v2.1.0_8
+pkgdesc="Unofficial control app for OBSBOT Tiny 2 cameras (beta versions)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/OWNER/gimbot"
+license=('MIT')
+depends=('qt6-base' 'qt6-declarative' 'qt6-multimedia' 'qt6-multimedia-ffmpeg' 'qt6-svg'
+         'kcoreaddons' 'kcrash' 'kglobalaccel' 'kstatusnotifieritem')
+makedepends=('cmake' 'extra-cmake-modules' 'unzip')
+provides=('gimbot' 'gimbotctl')
+conflicts=('gimbot')
+source=("gimbot-$_tag.tar.gz::$url/archive/refs/tags/$_tag.tar.gz"
+        "$_sdk.zip")
+noextract=("$_sdk.zip")
+sha256sums=('SKIP'
+            'SKIP')
+
+prepare() {
+  rm -rf sdk && mkdir sdk
+  bsdtar -xf "$_sdk.zip" -C sdk
+}
+
+build() {
+  cmake -S "gimbot-${_tag#v}" -B build \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DBUILD_TESTING=ON \
+    -DGIMBOT_REPO="OWNER/gimbot" \
+    -DOBSBOT_SDK_DIR="$srcdir/sdk/$_sdk"
+  cmake --build build
+}
+
+check() {
+  ctest --test-dir build --output-on-failure
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+  install -Dm644 "gimbot-${_tag#v}/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

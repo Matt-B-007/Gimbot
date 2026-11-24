@@ -1,0 +1,4 @@
+# OBSBOT cameras (USB vendor 3564): let the logged-in desktop user control
+# them without root. "uaccess" grants access to whoever is at the seat.
+SUBSYSTEM=="usb", ATTR{idVendor}=="3564", TAG+="uaccess"
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="3564", TAG+="uaccess"

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.gimbot.Gimbot</id>
+  <name>Gimbot</name>
+  <summary>Control OBSBOT cameras on Linux</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      An unofficial control app for OBSBOT Tiny 2 cameras: AI tracking, gimbal
+      aiming, zoom, presets, tracking areas, voice commands and every image
+      setting, with a live preview. Not affiliated with OBSBOT or Remo Tech.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.gimbot.Gimbot.desktop</launchable>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+  </categories>
+  <provides>
+    <binary>gimbot</binary>
+    <binary>gimbotctl</binary>
+    <modalias>usb:v3564p*</modalias>
+  </provides>
+  <releases>
+    <release version="0.1.0" date="2026-11-23" type="development"/>
+  </releases>
+</component>

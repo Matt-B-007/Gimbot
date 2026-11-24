@@ -1,0 +1,37 @@
+# Builds and tests Gimbot on Arch Linux (the base CachyOS uses) for every
+# push and pull request. OBSBOT's SDK is not public, so CI builds the
+# simulated-camera version and checks that every screen loads.
+name: Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  arch:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm --needed base-devel cmake extra-cmake-modules git dbus \
+            qt6-base qt6-declarative qt6-multimedia qt6-multimedia-ffmpeg qt6-svg \
+            kcoreaddons kcrash kglobalaccel kstatusnotifieritem
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Screens load without QML errors
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+        run: |
+          ./build/gimbot --fake --screenshots shots 2>&1 | tee run.log
+          ! grep -E " W qrc:| E " run.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: shots/
