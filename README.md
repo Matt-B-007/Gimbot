@@ -40,7 +40,7 @@ redistributing it. Gimbot installs `libdev.so` privately under
 2. Run:
 
 ```sh
-curl -fsSL https://raw-githubusercontent-com.hhj520.top/Matt-B-007/Gimbot/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh | bash
 ```
 
 That's it. The installer asks whether you want normal or beta releases, installs
@@ -85,7 +85,7 @@ nmcli connection up "NAME"
 To install while DNS is broken, let `curl` use a public DNS service too:
 
 ```sh
-curl --doh-url https://1.1.1.1/dns-query -fsSL https://raw-githubusercontent-com.hhj520.top/Matt-B-007/Gimbot/main/install.sh | bash
+curl --doh-url https://1.1.1.1/dns-query -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh | bash
 ```
 
 Or unzip the source and run `bash install.sh` inside it: that builds without
@@ -98,7 +98,7 @@ contacting GitHub at all.
 ```sh
 gimbot-update --uninstall
 # or, without Gimbot installed:
-curl -fsSL https://raw-githubusercontent-com.hhj520.top/Matt-B-007/Gimbot/main/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh | bash -s -- --uninstall
 ```
 
 This removes the package and the start-at-login entry, then asks whether to

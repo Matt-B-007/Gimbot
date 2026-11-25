@@ -1,12 +1,12 @@
-# Maintainer: Matt-B-007 <https://gh.hhj520.top/Matt-B-007>
+# Maintainer: Matt-B-007 <https://github.com/Matt-B-007>
 #
 # Beta channel: built from the newest test release (tags like v0.2.0-beta.1).
 # Same SDK note as the gimbot package: put libdev_v2.1.0_8.zip next to this
 # file before running makepkg.
 
 pkgname=gimbot-beta
-_tag=v0.1.0-beta.6          # the release tag on GitHub
-pkgver=0.1.0beta6           # the same, without characters pacman doesn't allow
+_tag=v0.1.0-beta.7          # the release tag on GitHub
+pkgver=0.1.0beta7           # the same, without characters pacman doesn't allow
 pkgrel=1
 _sdk=libdev_v2.1.0_8
 pkgdesc="Unofficial control app for OBSBOT Tiny 2 cameras (beta versions)"

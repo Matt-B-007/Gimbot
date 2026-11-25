@@ -15,8 +15,8 @@
   <developer id="io.github.matt_b_007">
     <name>Matt-B-007</name>
   </developer>
-  <url type="homepage">https://gh.hhj520.top/Matt-B-007/Gimbot</url>
-  <url type="bugtracker">https://gh.hhj520.top/Matt-B-007/Gimbot/issues</url>
+  <url type="homepage">https://github.com/Matt-B-007/Gimbot</url>
+  <url type="bugtracker">https://github.com/Matt-B-007/Gimbot/issues</url>
   <content_rating type="oars-1.1"/>
   <launchable type="desktop-id">io.github.Matt_B_007.Gimbot.desktop</launchable>
   <categories>
@@ -29,6 +29,7 @@
     <modalias>usb:v3564p*</modalias>
   </provides>
   <releases>
+    <release version="0.1.0-beta.7" date="2026-11-25" type="development"/>
     <release version="0.1.0-beta.6" date="2026-11-25" type="development"/>
     <release version="0.1.0-beta.5" date="2026-11-24" type="development"/>
     <release version="0.1.0-beta.4" date="2026-11-24" type="development"/>

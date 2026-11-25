@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Gimbot installer and updater for CachyOS, Arch and other Arch-based systems.
 #
-# Install:   curl -fsSL https://raw-githubusercontent-com.hhj520.top/Matt-B-007/Gimbot/main/install.sh | bash
+# Install:   curl -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh | bash
 # Update:    gimbot-update            (the app's "Update now" button runs this)
 # From zip:  bash install.sh         (run inside the unzipped folder)
 # Uninstall: gimbot-update --uninstall
-#            curl -fsSL https://raw-githubusercontent-com.hhj520.top/Matt-B-007/Gimbot/main/install.sh | bash -s -- --uninstall
+#            curl -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh | bash -s -- --uninstall
 #
 # It builds Gimbot on this computer with your own copy of the OBSBOT SDK
 # (OBSBOT emails it to you; the script finds it in ~/Downloads), packages it
@@ -143,10 +143,10 @@ latest_tag() { # latest_tag stable|beta
     local url
     if [[ "$1" == beta ]]; then
         # Newest published release of either kind.
-        url="https://api-github-com.hhj520.top/repos/$REPO/releases?per_page=1"
+        url="https://api.github.com/repos/$REPO/releases?per_page=1"
     else
         # GitHub's "latest" skips pre-releases and drafts.
-        url="https://api-github-com.hhj520.top/repos/$REPO/releases/latest"
+        url="https://api.github.com/repos/$REPO/releases/latest"
     fi
     local json
     json="$(net -fsSL --max-time 20 -H "Accept: application/vnd.github+json" "$url")" || return 1
@@ -346,7 +346,7 @@ else
             fi
         fi
         if [[ -z "$version" ]]; then
-            if net -fsS --max-time 20 -o /dev/null "https://api-github-com.hhj520.top/repos/$REPO"; then
+            if net -fsS --max-time 20 -o /dev/null "https://api.github.com/repos/$REPO"; then
                 die "github.com/$REPO has no published releases yet. Publish one on the Releases page first"
             fi
             die "couldn't reach GitHub: $(net_problem)"
@@ -354,7 +354,7 @@ else
     fi
     tag="$version"
     step 25 "Downloading Gimbot $tag"
-    net -fsSL --max-time 300 "https://gh.hhj520.top/$REPO/archive/refs/tags/$tag.tar.gz" -o "$work/src.tar.gz" \
+    net -fsSL --max-time 300 "https://github.com/$REPO/archive/refs/tags/$tag.tar.gz" -o "$work/src.tar.gz" \
         || die "couldn't download $tag: $(net_problem)"
     mkdir -p "$work/src"
     tar -xzf "$work/src.tar.gz" -C "$work/src" --strip-components=1

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 project(gimbot VERSION 0.1.0 LANGUAGES CXX)
 # The full version, including any pre-release part. project() only accepts
 # numbers, so this is what the app, the installer and the package use.
-set(GIMBOT_VERSION "0.1.0-beta.6")
+set(GIMBOT_VERSION "0.1.0-beta.7")
 if(NOT GIMBOT_VERSION MATCHES "^${PROJECT_VERSION}(-[0-9A-Za-z.]+)?$")
     message(FATAL_ERROR "GIMBOT_VERSION (${GIMBOT_VERSION}) must start with the project version (${PROJECT_VERSION})")
 endif()
@@ -242,6 +242,7 @@ if(BUILD_TESTING)
     target_include_directories(gimbot_tests PRIVATE src/app)
     target_link_libraries(gimbot_tests PRIVATE gimbotcore Qt6::Core Qt6::Network Qt6::Test)
     add_test(NAME gimbot_tests COMMAND gimbot_tests)
+    add_test(NAME web_addresses COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_urls.sh ${CMAKE_CURRENT_SOURCE_DIR})
     if(BUILD_GUI)
         add_executable(gimbot_controller_tests tests/test_controller.cpp
             src/app/controller.cpp src/app/worker.cpp src/app/logger.cpp)

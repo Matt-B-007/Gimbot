@@ -99,7 +99,7 @@ void Updater::startCheck(bool manual)
     m_manual = manual;
     m_retry.stop();
     setState("checking");
-    QNetworkRequest req(QUrl(QStringLiteral("https://api-github-com.hhj520.top/repos/%1/releases?per_page=30").arg(m_repo)));
+    QNetworkRequest req(QUrl(QStringLiteral("https://api.github.com/repos/%1/releases?per_page=30").arg(m_repo)));
     req.setRawHeader("Accept", "application/vnd.github+json");
     req.setHeader(QNetworkRequest::UserAgentHeader, QByteArray("Gimbot/") + m_current.toUtf8());
     req.setTransferTimeout(15000);
@@ -173,7 +173,7 @@ void Updater::checkWithCurl(int dohIndex)
     });
     proc->start(curl, {"-fsSL", "-S", "--max-time", "20", "--doh-url", doh[dohIndex], "-H", "Accept: application/vnd.github+json",
                        "-A", "Gimbot/" + m_current,
-                       QStringLiteral("https://api-github-com.hhj520.top/repos/%1/releases?per_page=30").arg(m_repo)});
+                       QStringLiteral("https://api.github.com/repos/%1/releases?per_page=30").arg(m_repo)});
 }
 
 void Updater::simulateCheckError()
