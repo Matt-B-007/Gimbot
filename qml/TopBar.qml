@@ -1,12 +1,21 @@
 import QtQuick
+import QtQuick.Controls
+import QtQml.Models
 import QtQuick.Layouts
 
-// App bar: logo, camera chip, command search, sleep and settings.
+// App bar: logo, camera chip, profile switcher, command search, sleep, help
+// and settings.
 RowLayout {
     id: root
     signal openPalette()
     signal openSettings()
+    signal openProfiles()
+    signal saveProfile()
+    signal openTour()
+    signal openReport()
+    signal openAbout()
     spacing: 10
+    readonly property bool compactBar: width < 980
 
     Image {
         source: "icons/gimbot.svg"
@@ -48,15 +57,60 @@ RowLayout {
         }
     }
 
+    AbstractButtonLike { // profile switcher
+        id: profileBtn
+        implicitHeight: 34
+        implicitWidth: profileRow.implicitWidth + 26
+        corner: 17
+        Accessible.name: cam.activeProfile.length > 0 ? qsTr("Profile: %1. Switch profile").arg(cam.activeProfile) : qsTr("Switch profile")
+        onClicked: profileMenu.popup(profileBtn, 0, profileBtn.height + 6)
+        Tip { visible: profileBtn.hovered && !profileMenu.visible; text: qsTr("Switch your whole setup at once, like “Meetings” or “Streaming”") }
+        RowLayout {
+            id: profileRow
+            anchors.centerIn: parent
+            spacing: 7
+            Icon { name: "layers"; size: 15; color: cam.activeProfile.length > 0 ? Theme.accentText : Theme.textMuted }
+            Text {
+                text: cam.activeProfile.length > 0 ? cam.activeProfile : qsTr("Profiles")
+                color: Theme.text
+                font.family: Theme.font
+                font.pixelSize: Theme.small + 1
+                font.weight: Font.Medium
+                elide: Text.ElideRight
+                Layout.maximumWidth: 140
+            }
+            Icon { name: "chevron-down"; size: 13; color: Theme.textMuted }
+        }
+    }
+    StyledMenu {
+        id: profileMenu
+        Instantiator {
+            model: cam.profiles
+            delegate: MenuEntry {
+                required property string modelData
+                text: (cam.activeProfile === modelData ? "✓  " : "     ") + modelData
+                enabled: cam.connected
+                onTriggered: cam.applyProfile(modelData)
+            }
+            onObjectAdded: (index, object) => profileMenu.insertItem(index, object)
+            onObjectRemoved: (index, object) => profileMenu.removeItem(object)
+        }
+        MenuEntry { text: cam.profiles.length === 0 ? qsTr("No profiles yet") : ""; enabled: false; visible: cam.profiles.length === 0; height: visible ? implicitHeight : 0 }
+        MenuLine {}
+        MenuEntry { text: qsTr("Save current setup as a profile…"); onTriggered: root.saveProfile() }
+        MenuEntry { text: qsTr("Manage profiles…"); onTriggered: root.openProfiles() }
+    }
+
     Item { Layout.fillWidth: true }
 
     AbstractButtonLike { // command search
         id: search
-        Layout.preferredWidth: 240
-        Layout.minimumWidth: 140
+        Layout.preferredWidth: root.compactBar ? 44 : 240
+        Layout.minimumWidth: root.compactBar ? 44 : 140
         implicitHeight: 36
         onClicked: root.openPalette()
         Accessible.name: qsTr("Search commands")
+        Tip { visible: search.hovered && root.compactBar; text: qsTr("Search commands"); shortcut: "Ctrl K" }
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: 12
@@ -64,6 +118,7 @@ RowLayout {
             spacing: 10
             Icon { name: "search"; size: 15; color: Theme.textMuted }
             Text {
+                visible: !root.compactBar
                 text: qsTr("Search commands")
                 color: Theme.textMuted
                 font.family: Theme.font
@@ -71,21 +126,39 @@ RowLayout {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
             }
-            Kbd { text: "Ctrl K" }
+            Kbd { text: "Ctrl K"; visible: !root.compactBar }
         }
     }
 
     Btn {
-        text: cam.values.asleep ? qsTr("Wake") : qsTr("Sleep")
+        text: root.compactBar ? "" : cam.values.asleep ? qsTr("Wake") : qsTr("Sleep")
         iconName: "moon"
         compact: false
         implicitHeight: 36
         enabled: cam.connected
+        tip: cam.values.asleep ? qsTr("Wake the camera") : qsTr("Put the camera to sleep. Other apps see a privacy screen.")
+        shortcut: "Ctrl L"
         onClicked: cam.set("asleep", !cam.values.asleep)
     }
     IconBtn {
+        id: helpBtn
+        iconName: "help"
+        tip: qsTr("Help")
+        implicitWidth: 36
+        implicitHeight: 36
+        onClicked: helpMenu.popup(helpBtn, 0, helpBtn.height + 6)
+    }
+    StyledMenu {
+        id: helpMenu
+        MenuEntry { text: qsTr("Show the tour"); onTriggered: root.openTour() }
+        MenuEntry { text: qsTr("All commands and shortcuts"); onTriggered: root.openPalette() }
+        MenuEntry { text: qsTr("Report a problem…"); onTriggered: root.openReport() }
+        MenuEntry { text: qsTr("About Gimbot"); onTriggered: root.openAbout() }
+    }
+    IconBtn {
         iconName: "gear"
-        tip: qsTr("Settings (Ctrl+,)")
+        tip: qsTr("Settings")
+        shortcut: "Ctrl ,"
         implicitWidth: 36
         implicitHeight: 36
         onClicked: root.openSettings()

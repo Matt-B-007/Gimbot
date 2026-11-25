@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
+import QtCore
 import QtQuick.Layouts
 
 // Every camera and app setting, grouped into sections with a side menu.
@@ -13,6 +14,9 @@ Rectangle {
     signal confirmFactoryReset()
     signal saveProfileRequested()
     signal openUpdate()
+    signal openTour()
+    signal openDirectionCheck()
+    signal openUninstall()
 
     readonly property bool connected: cam.connected
     readonly property var v: cam.values
@@ -192,8 +196,9 @@ Rectangle {
                             Rectangle { // where the camera points now
                                 width: 12; height: 12; radius: 6
                                 color: Theme.text
-                                x: parent.width * (cam.pan + parent.yawRange) / (2 * parent.yawRange) - 6
-                                y: parent.height * (-cam.tilt + parent.pitchRange) / (2 * parent.pitchRange) - 6
+                                // The area uses the SDK's frame: yaw + is your right, pitch + is down.
+                                x: parent.width * (cam.rawYaw + parent.yawRange) / (2 * parent.yawRange) - 6
+                                y: parent.height * (cam.rawPitch + parent.pitchRange) / (2 * parent.pitchRange) - 6
                             }
                             Text { x: 10; anchors.bottom: parent.bottom; anchors.bottomMargin: 8; text: qsTr("Your left"); color: Theme.textFaint; font.family: Theme.font; font.pixelSize: 11 }
                             Text { anchors.right: parent.right; anchors.rightMargin: 10; anchors.bottom: parent.bottom; anchors.bottomMargin: 8; text: qsTr("Your right"); color: Theme.textFaint; font.family: Theme.font; font.pixelSize: 11 }
@@ -417,7 +422,7 @@ Rectangle {
                         Segmented {
                             Layout.fillWidth: true
                             stretch: true
-                            options: [qsTr("Auto"), qsTr("Daylight"), qsTr("Cloudy"), qsTr("Tungsten"), qsTr("Fluorescent"), qsTr("Manual")]
+                            options: [qsTr("Auto"), qsTr("Daylight"), qsTr("Cloudy"), qsTr("Indoor"), qsTr("Fluorescent"), qsTr("Manual")]
                             currentIndex: root.v.wbMode
                             enabled: root.connected
                             onActivated: (i) => cam.set("wbMode", i)
@@ -501,17 +506,50 @@ Rectangle {
                             Toggle { checked: root.v.autoZoom; onToggled: cam.set("autoZoom", checked) }
                         }
                         SettingRow {
-                            label: qsTr("Reverse pan direction")
-                            description: qsTr("For a camera mounted upside down")
-                            Toggle { checked: root.v.yawReverse; onToggled: cam.set("yawReverse", checked) }
+                            label: qsTr("Movement")
+                            description: qsTr("How smoothly the camera glides for click-to-aim, the dial, presets and the arrow keys")
+                            Segmented {
+                                implicitWidth: 340
+                                stretch: true
+                                options: [qsTr("Fast"), qsTr("Normal"), qsTr("Smooth"), qsTr("Cinematic")]
+                                currentIndex: root.v.smoothness
+                                onActivated: (i) => cam.set("smoothness", i)
+                            }
                         }
                         SettingRow {
-                            label: qsTr("Flip click-to-aim left and right")
-                            description: qsTr("If clicking the preview turns the camera the wrong way")
+                            label: qsTr("Resume tracking by itself")
+                            description: qsTr("After you move the camera by hand, turn tracking back on once you stop")
+                            Toggle { checked: root.v.autoResume; onToggled: cam.set("autoResume", checked) }
+                        }
+                        SliderRow {
+                            Layout.fillWidth: true
+                            visible: root.v.autoResume
+                            label: qsTr("Resume after")
+                            from: 2; to: 30; stepSize: 1
+                            value: root.v.autoResumeSeconds
+                            valueText: qsTr("%1 s").arg(root.v.autoResumeSeconds)
+                            onMoved: (x) => cam.set("autoResumeSeconds", Math.round(x))
+                        }
+                        SettingRow {
+                            label: qsTr("Camera mounted upside down")
+                            description: qsTr("Tells the camera to reverse its turning direction")
+                            Toggle { checked: root.v.yawReverse; onToggled: cam.set("yawReverse", checked) }
+                        }
+
+                        Label2 { text: qsTr("Advanced"); Layout.topMargin: 8 }
+                        SettingRow {
+                            label: qsTr("Check movement directions")
+                            description: qsTr("Up should move the camera up and Right should move it right. If they don't, this fixes it in two steps.")
+                            Btn { text: qsTr("Check…"); iconName: "move"; compact: true; enabled: root.connected; onClicked: root.openDirectionCheck() }
+                        }
+                        SettingRow {
+                            label: qsTr("Flip left and right")
+                            description: qsTr("For every control: arrow keys, the dial, click-to-aim and dragging. Normally off.")
                             Toggle { checked: root.v.invertPan; onToggled: cam.set("invertPan", checked) }
                         }
                         SettingRow {
-                            label: qsTr("Flip click-to-aim up and down")
+                            label: qsTr("Flip up and down")
+                            description: qsTr("For every control. Normally off.")
                             divider: false
                             Toggle { checked: root.v.invertTilt; onToggled: cam.set("invertTilt", checked) }
                         }
@@ -665,6 +703,11 @@ Rectangle {
 
                         Label2 { text: qsTr("Help"); Layout.topMargin: 8 }
                         SettingRow {
+                            label: qsTr("Tour")
+                            description: qsTr("A quick look at the main controls")
+                            Btn { text: qsTr("Show the tour"); iconName: "help"; compact: true; onClicked: root.openTour() }
+                        }
+                        SettingRow {
                             label: qsTr("Report a problem")
                             description: qsTr("Collects version and log details for a bug report. Nothing is sent without you.")
                             Btn { text: qsTr("Report…"); iconName: "bug"; compact: true; onClicked: root.openReport() }
@@ -676,9 +719,14 @@ Rectangle {
                         }
                         SettingRow {
                             label: qsTr("Log files")
-                            divider: false
                             Btn { text: qsTr("Open folder"); iconName: "folder"; variant: "ghost"; compact: true; onClicked: platform.openLogFolder() }
                             Btn { text: qsTr("About Gimbot"); iconName: "info"; variant: "ghost"; compact: true; onClicked: root.openAbout() }
+                        }
+                        SettingRow {
+                            label: qsTr("Uninstall Gimbot")
+                            description: qsTr("Removes the app. You choose whether to keep your settings.")
+                            divider: false
+                            Btn { text: qsTr("Uninstall…"); variant: "danger"; compact: true; onClicked: root.openUninstall() }
                         }
                     }
 
@@ -695,8 +743,7 @@ Rectangle {
                                 model: [{ k: qsTr("Model"), v: root.connected ? cam.model : "—" },
                                         { k: qsTr("Serial number"), v: root.connected ? cam.serial : "—" },
                                         { k: qsTr("Firmware"), v: root.connected ? cam.firmware : "—" },
-                                        { k: qsTr("OBSBOT SDK"), v: platform.sdkVersion },
-                                        { k: qsTr("Firmware updates"), v: qsTr("Use OBSBOT Center on Windows or Mac") },
+                                        { k: qsTr("Firmware updates"), v: qsTr("OBSBOT Center on Windows or macOS (the SDK can't update firmware)") },
                                         { k: qsTr("Gimbot"), v: platform.version }]
                                 ColumnLayout {
                                     required property var modelData
@@ -713,6 +760,26 @@ Rectangle {
                                         Layout.fillWidth: true
                                     }
                                 }
+                            }
+                        }
+                        SettingRow {
+                            readonly property string saved: platform.savedSdk
+                            readonly property string savedVersion: saved.replace(/^libdev_?v?/, "").replace(/\.zip$/, "")
+                            readonly property bool newer: saved.length > 0 && savedVersion !== platform.sdkVersion
+                            label: qsTr("OBSBOT SDK %1").arg(platform.sdkVersion)
+                            description: saved.length > 0
+                                ? (newer ? qsTr("Saved: %1 (newer than this build). Rebuild Gimbot to use it.").arg(saved)
+                                         : qsTr("Saved in Gimbot's folder: %1. You can delete it from Downloads.").arg(saved))
+                                : qsTr("No SDK saved in Gimbot's folder yet. Add it so updates work without your Downloads folder.")
+                            Btn { text: qsTr("Open folder"); iconName: "folder"; variant: "ghost"; compact: true; onClicked: platform.openSdkFolder() }
+                            Btn { text: qsTr("Add SDK…"); iconName: "plus"; compact: true; onClicked: sdkDialog.open() }
+                            Btn {
+                                visible: parent.parent.newer && updater.canInstall
+                                text: qsTr("Rebuild")
+                                iconName: "refresh"
+                                variant: "primary"
+                                compact: true
+                                onClicked: { updater.rebuild(); root.openUpdate() }
                             }
                         }
                         SettingRow {
@@ -742,6 +809,16 @@ Rectangle {
         }
     }
 
+    FileDialog {
+        id: sdkDialog
+        title: qsTr("Choose the OBSBOT SDK zip")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [qsTr("OBSBOT SDK (libdev*.zip)")]
+        currentFolder: StandardPaths.writableLocation(StandardPaths.DownloadLocation)
+        onAccepted: {
+            if (platform.adoptSdk(selectedFile) && updater.canInstall) { updater.rebuild(); root.openUpdate() }
+        }
+    }
     FileDialog {
         id: exportDialog
         fileMode: FileDialog.SaveFile

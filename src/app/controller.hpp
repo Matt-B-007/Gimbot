@@ -32,8 +32,14 @@ class Controller : public QObject {
     Q_PROPERTY(QVariantMap ranges READ ranges NOTIFY rangesChanged)
     Q_PROPERTY(QVariantList presets READ presets NOTIFY presetsChanged)
     Q_PROPERTY(int maxPresets READ maxPresets CONSTANT)
+    // Where the camera points, as seen in the preview: up and right positive.
     Q_PROPERTY(double pan READ pan NOTIFY positionChanged)
     Q_PROPERTY(double tilt READ tilt NOTIFY positionChanged)
+    // The same in the SDK's frame (for the tracking-area editor).
+    Q_PROPERTY(double rawYaw READ rawYaw NOTIFY positionChanged)
+    Q_PROPERTY(double rawPitch READ rawPitch NOTIFY positionChanged)
+    Q_PROPERTY(bool trackingPaused READ trackingPaused NOTIFY trackingPausedChanged)
+    Q_PROPERTY(QString activeProfile READ activeProfile NOTIFY activeProfileChanged)
     Q_PROPERTY(bool livePosition READ livePosition WRITE setLivePosition NOTIFY livePositionChanged)
     Q_PROPERTY(QStringList profiles READ profiles NOTIFY profilesChanged)
     Q_PROPERTY(QStringList shutterLabels READ shutterLabels CONSTANT)
@@ -54,8 +60,12 @@ public:
     QVariantMap ranges() const { return m_ranges; }
     QVariantList presets() const { return m_presets; }
     int maxPresets() const { return 3; }
-    double pan() const { return m_pan; }
-    double tilt() const { return m_tilt; }
+    double pan() const;
+    double tilt() const;
+    double rawYaw() const { return m_yaw; }
+    double rawPitch() const { return m_pitch; }
+    bool trackingPaused() const { return m_trackingPaused; }
+    QString activeProfile() const { return m_activeProfile; }
     bool livePosition() const { return m_livePosition; }
     void setLivePosition(bool on);
     QStringList profiles() const;
@@ -65,14 +75,25 @@ public:
     Q_INVOKABLE void set(const QString &key, const QVariant &value);
     Q_INVOKABLE QVariant get(const QString &key) const { return m_values.value(key); }
 
-    // Gimbal: directions -1..1 (up/right positive), scaled by gimbalSpeed.
+    // Gimbal, in screen directions: -1..1 with up and right positive, scaled
+    // by gimbalSpeed.
     Q_INVOKABLE void move(double tilt, double pan);
+    // Move briefly in one direction (for the direction check).
+    Q_INVOKABLE void nudge(double tilt, double pan);
     Q_INVOKABLE void stopMove();
     Q_INVOKABLE void recenter();
     Q_INVOKABLE void aimAt(double x, double y); // point in the preview, 0..1
-    Q_INVOKABLE void aimAbsolute(double pan, double tilt); // degrees
+    Q_INVOKABLE void aimAbsolute(double pan, double tilt); // degrees, screen frame
     Q_INVOKABLE void zoomBy(int delta);
+
+    // Tracking on/off. Turning it on returns to the last mode used.
     Q_INVOKABLE void toggleTracking();
+    Q_INVOKABLE void setTracking(bool on);
+    Q_INVOKABLE void resumeTracking();
+
+    // Undo the last reset, profile change or profile deletion.
+    Q_INVOKABLE void undo();
+    Q_INVOKABLE void resetTracking();
 
     // Presets. savePreset returns the slot used, or -1 if all are full.
     Q_INVOKABLE int savePreset(const QString &name);
@@ -110,7 +131,11 @@ signals:
     void positionChanged();
     void livePositionChanged();
     void profilesChanged();
+    void trackingPausedChanged();
+    void activeProfileChanged();
     void errorOccurred(const QString &message);
+    // Something was changed that can be undone with undo().
+    void undoAvailable(const QString &message);
     void notice(const QString &message);
     // A setting handled by the app itself changed (autostart, logging, ...).
     void appSettingChanged(const QString &key, const QVariant &value);
@@ -138,6 +163,10 @@ private:
     void reloadPresets();
     void buildPresetList(const std::vector<t2::Preset> &list);
     void leaveTracking();
+    t2::axis::Orientation orientation() const;
+    float glide() const;
+    void setPaused(bool on);
+    void snapshotForUndo(const QStringList &keys, const QString &message);
     void call(const QString &key, const QString &what, std::function<bool(t2::Camera &)> fn, bool latest = true);
     void pollPosition();
 
@@ -154,7 +183,14 @@ private:
     bool m_livePosition = false;
     bool m_positionPending = false;
     QString m_model, m_serial, m_firmware;
-    double m_pan = 0, m_tilt = 0;
+    double m_yaw = 0, m_pitch = 0; // SDK frame
+    bool m_trackingPaused = false;
+    bool m_internalSet = false; // set() called by the app itself, not the user
+    QString m_activeProfile;
+    QTimer m_resumeTimer;
+    QVariantMap m_undo;          // settings to restore
+    QString m_undoProfile;       // deleted profile to restore
+    QVariantMap m_undoProfileData;
 
     QHash<QString, Setting> m_table;
     QVariantMap m_values;

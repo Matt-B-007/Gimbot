@@ -1,15 +1,24 @@
 import QtQuick
 import QtQuick.Layouts
 
-// Pan/tilt dial (click or drag to aim), live angles, recenter and zoom.
+// Pan/tilt dial (click or drag to aim), live angles, recenter, zoom and how
+// smoothly the camera moves.
 Card {
     id: root
     title: qsTr("Aim")
+    moreKey: "moreAim"
+    readonly property bool usable: cam.connected && !cam.values.asleep
+    note: cam.values.asleep ? qsTr("The camera is asleep. Wake it to move it.") : ""
+    noteAction: cam.values.asleep ? qsTr("Wake") : ""
+    onNoteActivated: cam.set("asleep", false)
     headerExtras: Btn {
         text: qsTr("Recenter")
+        iconName: "target"
         compact: true
         pill: true
-        enabled: cam.connected
+        enabled: root.usable
+        tip: qsTr("Point the camera straight ahead")
+        shortcut: "Home"
         onClicked: cam.recenter()
     }
 
@@ -35,7 +44,9 @@ Card {
             color: Theme.sunken
             border.color: Theme.border
             Accessible.role: Accessible.Dial
-            Accessible.name: qsTr("Pan %1, tilt %2. Click to aim.").arg(root.fmt(root.shownPan)).arg(root.fmt(root.shownTilt))
+            Accessible.name: qsTr("Aim dial. Pan %1, tilt %2. Click or drag to aim.").arg(root.fmt(root.shownPan)).arg(root.fmt(root.shownTilt))
+            HoverHandler { id: dialHover }
+            Tip { visible: dialHover.hovered && !root.dragging; text: qsTr("Click or drag to point the camera. Up is up, right is right.") }
 
             Rectangle { x: parent.width / 2; y: 10; width: 1; height: parent.height - 20; color: Theme.border }
             Rectangle { y: parent.height / 2; x: 10; height: 1; width: parent.width - 20; color: Theme.border }
@@ -54,7 +65,7 @@ Card {
 
             MouseArea {
                 anchors.fill: parent
-                enabled: cam.connected && !cam.values.asleep
+                enabled: root.usable
                 cursorShape: Qt.CrossCursor
                 function toAngles(mx, my) {
                     const r = dial.width / 2 - 14
@@ -72,7 +83,7 @@ Card {
             spacing: 12
             Layout.fillWidth: true
             Repeater {
-                model: [{ label: qsTr("Pan"), value: root.shownPan }, { label: qsTr("Tilt"), value: root.shownTilt }]
+                model: [{ label: qsTr("Pan (right +)"), value: root.shownPan }, { label: qsTr("Tilt (up +)"), value: root.shownTilt }]
                 ColumnLayout {
                     required property var modelData
                     spacing: 0
@@ -87,7 +98,7 @@ Card {
                 }
             }
             Text {
-                text: qsTr("Arrow keys move · Home recenters")
+                text: qsTr("Arrow keys move · Home recenters · drag the picture to steer")
                 color: Theme.textFaint
                 font.family: Theme.font
                 font.pixelSize: Theme.small - 1
@@ -103,7 +114,51 @@ Card {
         from: 0; to: 100; stepSize: 1
         value: cam.values.zoom
         valueText: cam.values.zoom + "%"
-        enabled: cam.connected
+        tip: qsTr("Also: + and − keys, or scroll on the picture")
+        enabled: root.usable
         onMoved: (v) => cam.set("zoom", Math.round(v))
     }
+
+    ColumnLayout {
+        spacing: 8
+        Layout.fillWidth: true
+        Text { text: qsTr("Movement"); color: Theme.textMuted; font.family: Theme.font; font.pixelSize: Theme.small }
+        Segmented {
+            Layout.fillWidth: true
+            stretch: true
+            options: [qsTr("Fast"), qsTr("Normal"), qsTr("Smooth"), qsTr("Cinematic")]
+            tips: [qsTr("Jump straight to the new spot"), qsTr("Quick glide"), qsTr("Slow, gentle glide"),
+                   qsTr("Very slow glide, good for live streams")]
+            accessibleName: qsTr("Movement smoothness")
+            currentIndex: cam.values.smoothness
+            onActivated: (i) => cam.set("smoothness", i)
+        }
+        Text {
+            text: qsTr("For click-to-aim, the dial, presets and the arrow keys.")
+            color: Theme.textFaint
+            font.family: Theme.font
+            font.pixelSize: Theme.small
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
+    }
+
+    more: [
+        SliderRow {
+            Layout.fillWidth: true
+            label: qsTr("Arrow key and drag speed")
+            from: 10; to: 120; stepSize: 5
+            value: cam.values.gimbalSpeed
+            valueText: cam.values.gimbalSpeed + "°/s"
+            onMoved: (x) => cam.set("gimbalSpeed", Math.round(x))
+        },
+        SliderRow {
+            Layout.fillWidth: true
+            label: qsTr("Zoom speed")
+            from: 0; to: 10; stepSize: 1
+            value: cam.values.zoomSpeed
+            valueText: cam.values.zoomSpeed === 0 ? qsTr("Camera default") : cam.values.zoomSpeed + " / 10"
+            onMoved: (x) => cam.set("zoomSpeed", Math.round(x))
+        }
+    ]
 }

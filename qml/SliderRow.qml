@@ -12,6 +12,7 @@ ColumnLayout {
     property alias stepSize: slider.stepSize
     property real value: 0
     property bool dim: false
+    property string tip: ""
     signal moved(real value)
 
     spacing: 8
@@ -44,6 +45,9 @@ ColumnLayout {
         value: root.value
         focusPolicy: Qt.StrongFocus
         Accessible.name: root.label
+        Accessible.description: root.tip
+        hoverEnabled: true
+        Tip { visible: slider.hovered && root.tip.length > 0 && !slider.pressed; text: root.tip }
         onMoved: root.moved(value)
         // Keep following the model unless the user is dragging.
         Binding on value { value: root.value; when: !slider.pressed }

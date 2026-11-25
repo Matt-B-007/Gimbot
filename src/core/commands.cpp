@@ -27,8 +27,8 @@ const char *commandHelp()
            "\n"
            "Gimbal and zoom\n"
            "  center                       Recenter the gimbal\n"
-           "  aim PITCH YAW                Move to absolute angles (degrees)\n"
-           "  turn DPITCH DYAW             Move relative to where it is\n"
+           "  aim TILT PAN                 Move to angles in degrees (up and right are +)\n"
+           "  turn TILT PAN                Move relative to where it is (up and right are +)\n"
            "  zoom PERCENT                 0..100\n"
            "  zoom-speed 0..10             0 = camera default\n"
            "\n"
@@ -123,7 +123,12 @@ int runCommand(Camera &cam, const std::vector<std::string> &args, std::string &o
         if (s.mode == Mode::Person && s.framing >= 0 && s.framing < 3) out += fmt(" (%s)", framings[s.framing]);
         out += fmt("\nZoom:      %d%%\n", s.zoomPercent);
         GimbalPos pos;
-        if (cam.position(pos)) out += fmt("Gimbal:    pitch %.1f°, yaw %.1f°\n", pos.pitch, pos.yaw);
+        if (cam.position(pos)) {
+            axis::Orientation o;
+            o.mirrored = cam.status().mirrored;
+            out += fmt("Gimbal:    tilt %+.1f°, pan %+.1f° (up and right are +)\n",
+                       axis::screenFromPitch(pos.pitch, o), axis::screenFromYaw(pos.yaw, o));
+        }
         out += fmt("FOV:       %s\n", s.fov >= 0 && s.fov < 3 ? fovs[s.fov] : "?");
         out += fmt("HDR:       %s\nMirror:    %s\n", s.hdr ? "on" : "off", s.mirrored ? "on" : "off");
         if (s.autoFocus) out += fmt("Focus:     auto%s\n", s.faceFocus ? " (face)" : "");
@@ -156,14 +161,21 @@ int runCommand(Camera &cam, const std::vector<std::string> &args, std::string &o
     }
 
     if (cmd == "center") return done(cam.recenter());
-    if (cmd == "aim" && args.size() > 2) return done(cam.moveTo(fnum(1), fnum(2)));
-    if (cmd == "turn" && args.size() > 2) {
-        GimbalPos p;
-        if (!cam.position(p)) {
-            out += "could not read the gimbal position\n";
-            return 1;
+    if ((cmd == "aim" || cmd == "turn") && args.size() > 2) {
+        axis::Orientation o;
+        o.mirrored = cam.status().mirrored;
+        float pitch = static_cast<float>(axis::pitchFromScreen(fnum(1), o));
+        float yaw = static_cast<float>(axis::yawFromScreen(fnum(2), o));
+        if (cmd == "turn") {
+            GimbalPos p;
+            if (!cam.position(p)) {
+                out += "could not read the gimbal position\n";
+                return 1;
+            }
+            pitch += p.pitch;
+            yaw += p.yaw;
         }
-        return done(cam.moveTo(p.pitch + fnum(1), p.yaw + fnum(2)));
+        return done(cam.moveTo(pitch, yaw));
     }
     if (cmd == "zoom" && args.size() > 1) return done(cam.setZoom(num(1)));
     if (cmd == "zoom-speed" && args.size() > 1) return done(cam.setZoomSpeed(num(1)));

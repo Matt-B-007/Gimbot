@@ -15,7 +15,12 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QSocketNotifier>
 #include <QTimer>
+
+#include <csignal>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #ifdef GIMBOT_HAVE_KF6
 #include <KAboutData>
@@ -30,6 +35,32 @@
 #endif
 
 static const char kService[] = "io.github.Matt_B_007.Gimbot";
+
+// Ctrl+C in a terminal, or a normal "please quit" from the system, should
+// close Gimbot properly so the next start doesn't think it crashed. Signal
+// handlers can't call Qt, so they write a byte that Qt picks up.
+static int quitPipe[2] = {-1, -1};
+static void onQuitSignal(int)
+{
+    const char c = 1;
+    [[maybe_unused]] auto n = ::write(quitPipe[1], &c, 1);
+}
+static void quitOnSignals(QCoreApplication &app)
+{
+    if (::socketpair(AF_UNIX, SOCK_STREAM, 0, quitPipe) != 0) return;
+    auto *notifier = new QSocketNotifier(quitPipe[0], QSocketNotifier::Read, &app);
+    QObject::connect(notifier, &QSocketNotifier::activated, &app, [&app] {
+        char c;
+        [[maybe_unused]] auto n = ::read(quitPipe[0], &c, 1);
+        qInfo() << "Asked to quit";
+        app.quit();
+    });
+    struct sigaction sa = {};
+    sa.sa_handler = onQuitSignal;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    for (int sig : {SIGINT, SIGTERM, SIGHUP}) sigaction(sig, &sa, nullptr);
+}
 
 int main(int argc, char *argv[])
 {
@@ -130,6 +161,15 @@ int main(int argc, char *argv[])
 
     QObject::connect(&platform, &Platform::quitRequested, &app, &QCoreApplication::quit);
     QObject::connect(&app, &QCoreApplication::aboutToQuit, &platform, &Platform::markCleanExit);
+    quitOnSignals(app);
+
+    // A newer OBSBOT SDK in Downloads? Look shortly after starting, then now and then.
+    if (!screenshotMode) {
+        QTimer::singleShot(3000, &platform, &Platform::checkForNewSdk);
+        auto *sdkTimer = new QTimer(&app);
+        QObject::connect(sdkTimer, &QTimer::timeout, &platform, &Platform::checkForNewSdk);
+        sdkTimer->start(10 * 60 * 1000);
+    }
 
     if (screenshotMode) {
         // Visit each screen and save a picture of it. Used to check the
@@ -137,8 +177,12 @@ int main(int argc, char *argv[])
         const QString dir = parser.value(shots);
         QDir().mkpath(dir);
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
-        const QStringList steps = {"studio", "settings", "settings:image", "settings:app", "palette", "report",
-                                   "about",  "connect", "studio-dark", "settings:voice-dark", "settings:area-dark", "report-dark", "connect-dark", "update", "updating", "updated"};
+        engine.rootObjects().first()->setProperty("screenshotMode", true);
+        const QStringList steps = {"studio",  "more", "settings", "settings:image", "settings:motion", "settings:app",
+                                   "settings:device", "palette", "report", "about", "connect", "tour",
+                                   "directions", "uninstall", "studio-dark", "settings:voice-dark",
+                                   "settings:area-dark", "report-dark", "connect-dark", "update", "updating",
+                                   "updated", "small", "small-dark"};
         auto index = std::make_shared<int>(0);
         auto *timer = new QTimer(&app);
         timer->setInterval(1400);

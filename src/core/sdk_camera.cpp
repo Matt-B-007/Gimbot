@@ -30,6 +30,7 @@ Status convert(const Device::CameraStatus &cs)
     const auto &t = cs.tiny;
     Status s;
     s.valid = true;
+    s.modeSwitching = t.ai_mode == Device::AiWorkModeSwitching;
     s.mode = static_cast<Mode>(t.ai_mode <= 5 ? t.ai_mode : 0);
     s.framing = std::clamp<int>(t.ai_sub_mode, 0, 2);
     s.zoomPercent = std::clamp<int>(t.zoom_ratio, 0, 100);
@@ -205,9 +206,15 @@ public:
         return ok(dev_->aiSetGimbalSpeedCtrlR(std::clamp(pitchSpeed, -90.0, 90.0), std::clamp(yawSpeed, -180.0, 180.0),
                                               0.0));
     }
-    bool moveTo(float pitch, float yaw) override
+    bool moveTo(float pitch, float yaw, float speed = 0) override
     {
-        return ok(dev_->aiSetGimbalMotorAngleR(std::clamp(pitch, -90.f, 90.f), std::clamp(yaw, -180.f, 180.f)));
+        pitch = std::clamp(pitch, -90.f, 90.f);
+        if (speed > 0) {
+            // Glide at a reference speed (Tiny 2: yaw -120..120, speed up to 90).
+            const float s = std::clamp(speed, 1.f, 90.f);
+            return ok(dev_->gimbalSetSpeedPositionR(0, pitch, std::clamp(yaw, -120.f, 120.f), 0, s, s));
+        }
+        return ok(dev_->aiSetGimbalMotorAngleR(pitch, std::clamp(yaw, -180.f, 180.f)));
     }
     bool recenter() override { return ok(dev_->gimbalRstPosR()); }
     bool position(GimbalPos &out) const override
@@ -230,6 +237,12 @@ public:
             return ok(dev_->cameraSetZoomWithSpeedAbsoluteR(ratio, static_cast<uint32_t>(zoomSpeed_)));
         }
         return ok(dev_->cameraSetZoomAbsoluteR(1.0f + percent / 100.0f));
+    }
+    bool setZoomAtSpeed(int percent, int speed) override
+    {
+        percent = std::clamp(percent, 0, 100);
+        auto ratio = static_cast<uint32_t>(zoomMin_ + (zoomMax_ - zoomMin_) * percent / 100);
+        return ok(dev_->cameraSetZoomWithSpeedAbsoluteR(ratio, static_cast<uint32_t>(std::clamp(speed, 0, 10))));
     }
     bool setZoomSpeed(int speed) override
     {

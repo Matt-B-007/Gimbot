@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.21)
 project(gimbot VERSION 0.1.0 LANGUAGES CXX)
+# The full version, including any pre-release part. project() only accepts
+# numbers, so this is what the app, the installer and the package use.
+set(GIMBOT_VERSION "0.1.0-beta.4")
+if(NOT GIMBOT_VERSION MATCHES "^${PROJECT_VERSION}(-[0-9A-Za-z.]+)?$")
+    message(FATAL_ERROR "GIMBOT_VERSION (${GIMBOT_VERSION}) must start with the project version (${PROJECT_VERSION})")
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -98,10 +104,58 @@ if(BUILD_GUI)
 
     set(GIMBOT_HAVE_KF6 OFF)
     if(WITH_KDE)
-        find_package(ECM 6.0 QUIET NO_MODULE)
-        find_package(KF6 6.0 QUIET COMPONENTS CoreAddons Crash GlobalAccel StatusNotifierItem)
+        # Each framework ships its own CMake package (KF6CoreAddons, ...).
+        foreach(_kf IN ITEMS CoreAddons Crash GlobalAccel StatusNotifierItem)
+            find_package(KF6${_kf} 6.0 QUIET CONFIG)
+        endforeach()
         if(KF6CoreAddons_FOUND AND KF6Crash_FOUND AND KF6GlobalAccel_FOUND AND KF6StatusNotifierItem_FOUND)
-            set(GIMBOT_HAVE_KF6 ON)
+            # Compile a small program that makes exactly the KDE calls Gimbot
+            # makes. If this system's KDE Frameworks differ, build without the
+            # integration instead of failing.
+            include(CheckCXXSourceCompiles)
+            set(CMAKE_REQUIRED_LIBRARIES KF6::CoreAddons KF6::Crash KF6::GlobalAccel KF6::StatusNotifierItem
+                                         Qt6::Widgets)
+            set(CMAKE_REQUIRED_FLAGS "-std=c++20 -fPIC")
+            check_cxx_source_compiles([=[
+                #include <KAboutData>
+                #include <KCrash>
+                #include <KGlobalAccel>
+                #include <KStatusNotifierItem>
+                #include <QAction>
+                #include <QApplication>
+                #include <QMenu>
+                int main(int argc, char **argv) {
+                    QApplication app(argc, argv);
+                    KAboutData about(QStringLiteral("gimbot"), QStringLiteral("Gimbot"), QStringLiteral("1"),
+                                     QStringLiteral("x"), KAboutLicense::MIT);
+                    about.setHomepage(QStringLiteral("https://example.org"));
+                    about.setBugAddress(QByteArray("https://example.org/issues"));
+                    KAboutData::setApplicationData(about);
+                    KCrash::initialize();
+                    auto *sni = new KStatusNotifierItem(QStringLiteral("gimbot"), &app);
+                    sni->setTitle(QStringLiteral("Gimbot"));
+                    sni->setIconByName(QStringLiteral("gimbot-symbolic"));
+                    sni->setCategory(KStatusNotifierItem::Hardware);
+                    sni->setStatus(KStatusNotifierItem::Active);
+                    sni->setStandardActionsEnabled(false);
+                    sni->setContextMenu(new QMenu);
+                    QObject::connect(sni, &KStatusNotifierItem::activateRequested, &app, [](bool, const QPoint &) {});
+                    auto *a = new QAction(QStringLiteral("x"), &app);
+                    a->setObjectName(QStringLiteral("x"));
+                    a->setProperty("componentName", QStringLiteral("gimbot"));
+                    KGlobalAccel::self()->setGlobalShortcut(a, QList<QKeySequence>{});
+                    return 0;
+                }]=] GIMBOT_KF6_WORKS)
+            unset(CMAKE_REQUIRED_LIBRARIES)
+            unset(CMAKE_REQUIRED_FLAGS)
+            if(GIMBOT_KF6_WORKS)
+                set(GIMBOT_HAVE_KF6 ON)
+            else()
+                message(WARNING "KDE Frameworks found, but the test program didn't build; continuing without KDE integration. "
+                                "See CMakeFiles/CMakeConfigureLog.yaml for why.")
+            endif()
+        else()
+            message(STATUS "KDE Frameworks not found (need KF6CoreAddons, KF6Crash, KF6GlobalAccel, KF6StatusNotifierItem)")
         endif()
     endif()
     message(STATUS "KDE Frameworks integration: ${GIMBOT_HAVE_KF6}")
@@ -112,7 +166,8 @@ if(BUILD_GUI)
         src/app/worker.cpp src/app/worker.hpp
         src/app/logger.cpp src/app/logger.hpp
         src/app/updater.cpp src/app/updater.hpp
-        src/app/platform.cpp src/app/platform.hpp)
+        src/app/platform.cpp src/app/platform.hpp
+        src/app/previewformat.cpp src/app/previewformat.hpp)
 
     set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
     # Place every QML file and asset at the module's root (not under qml/),
@@ -137,6 +192,8 @@ if(BUILD_GUI)
             qml/Icon.qml qml/Btn.qml qml/IconBtn.qml qml/Segmented.qml qml/Toggle.qml
             qml/SliderRow.qml qml/Select.qml qml/Card.qml qml/SettingRow.qml qml/Field.qml
             qml/Kbd.qml qml/StyledMenu.qml qml/AbstractButtonLike.qml
+            qml/Tip.qml qml/MenuEntry.qml qml/MenuLine.qml qml/StatusStrip.qml qml/Tour.qml
+            qml/DirectionCheck.qml qml/UninstallDialog.qml
         RESOURCES
             qml/icons/gimbot.svg
             qml/fonts/Inter-Regular.ttf qml/fonts/Inter-Medium.ttf
@@ -146,7 +203,7 @@ if(BUILD_GUI)
         Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::DBus
         Qt6::Svg Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Multimedia)
     target_compile_definitions(gimbot PRIVATE
-        GIMBOT_VERSION="${PROJECT_VERSION}"
+        GIMBOT_VERSION="${GIMBOT_VERSION}"
         GIMBOT_SDK_VERSION="${GIMBOT_SDK_VERSION}"
         GIMBOT_REPO="${GIMBOT_REPO}")
     target_compile_options(gimbot PRIVATE -Wall -Wextra -Wno-unused-parameter)
@@ -168,8 +225,17 @@ endif()
 include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 ${GIMBOT_MIN_QT} REQUIRED COMPONENTS Test)
-    add_executable(gimbot_tests tests/test_core.cpp src/app/updater.cpp)
+    add_executable(gimbot_tests tests/test_core.cpp src/app/updater.cpp src/app/previewformat.cpp)
     target_include_directories(gimbot_tests PRIVATE src/app)
     target_link_libraries(gimbot_tests PRIVATE gimbotcore Qt6::Core Qt6::Network Qt6::Test)
     add_test(NAME gimbot_tests COMMAND gimbot_tests)
+    if(BUILD_GUI)
+        add_executable(gimbot_controller_tests tests/test_controller.cpp
+            src/app/controller.cpp src/app/worker.cpp src/app/logger.cpp)
+        target_include_directories(gimbot_controller_tests PRIVATE src/app)
+        target_link_libraries(gimbot_controller_tests PRIVATE gimbotcore Qt6::Core Qt6::Gui Qt6::Test)
+        set_target_properties(gimbot_controller_tests PROPERTIES AUTOMOC ON)
+        add_test(NAME gimbot_controller_tests COMMAND gimbot_controller_tests)
+        set_tests_properties(gimbot_controller_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    endif()
 endif()

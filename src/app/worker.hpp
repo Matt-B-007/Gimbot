@@ -14,6 +14,8 @@ class Worker : public QObject {
 public:
     explicit Worker(QObject *parent = nullptr);
     ~Worker() override;
+    // Finish queued jobs and stop the thread (safe to call twice).
+    void stop();
 
     // Queue a job.
     void post(std::function<void()> job);

@@ -11,6 +11,8 @@ Rectangle {
     property bool onVideo: false  // floating over the preview
     property int itemHeight: 34
     property bool stretch: false   // share extra width between the options
+    property var tips: []          // optional hover explanation per option
+    property string accessibleName: ""
     signal activated(int index)
 
     implicitHeight: itemHeight + 8
@@ -20,6 +22,7 @@ Rectangle {
     border.width: onVideo ? 1 : 0
     border.color: Qt.rgba(1, 1, 1, 0.1)
     Accessible.role: Accessible.PageTabList
+    Accessible.name: accessibleName
 
     Rectangle {
         id: highlight
@@ -57,7 +60,12 @@ Rectangle {
                 checkable: true
                 checked: selected
                 Accessible.name: modelData
-                onClicked: { root.currentIndex = index; root.activated(index) }
+                onClicked: root.activated(index) // the owner updates currentIndex (keeps its binding)
+                Tip {
+                    readonly property string t: root.tips.length > btn.index ? root.tips[btn.index] : ""
+                    visible: btn.hovered && t.length > 0
+                    text: t
+                }
                 background: Rectangle {
                     radius: root.pill ? height / 2 : Theme.radius - 3
                     color: !btn.selected && btn.hovered ? (root.onVideo ? Qt.rgba(1, 1, 1, 0.08) : Theme.hover) : "transparent"

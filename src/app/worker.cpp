@@ -10,8 +10,11 @@ Worker::Worker(QObject *parent) : QObject(parent), m_ctx(new QObject)
     m_thread.start();
 }
 
-Worker::~Worker()
+Worker::~Worker() { stop(); }
+
+void Worker::stop()
 {
+    // Runs the jobs already queued, then ends the thread.
     m_thread.quit();
     m_thread.wait();
 }

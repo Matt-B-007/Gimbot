@@ -1,4 +1,7 @@
 #include "platform.hpp"
+#include "previewformat.hpp"
+
+#include <QVideoFrameFormat>
 
 #include "controller.hpp"
 #include "logger.hpp"
@@ -14,6 +17,7 @@
 #include <QDir>
 #include <QFile>
 #include <QIcon>
+#include <QRegularExpression>
 #include <QMenu>
 #include <QStandardPaths>
 #include <QSysInfo>
@@ -70,6 +74,111 @@ bool Platform::kdeIntegration() const
 }
 QString Platform::repoUrl() const { return m_repo.isEmpty() ? QString() : "https://github.com/" + m_repo; }
 QString Platform::logFile() const { return Logger::logFile(); }
+
+// ---------------------------------------------------------------- OBSBOT SDK folder
+
+QString Platform::sdkFolder() const
+{
+    // Same place the installer keeps it.
+    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/gimbot/sdk";
+}
+
+QString Platform::savedSdk() const
+{
+    const auto list = QDir(sdkFolder()).entryList({"libdev*.zip"}, QDir::Files);
+    QString best;
+    for (const auto &f : list)
+        if (best.isEmpty() || compareSdk(sdkVersionOf(f), sdkVersionOf(best)) > 0) best = f;
+    return best;
+}
+
+QString Platform::sdkVersionOf(const QString &fileName)
+{
+    static const QRegularExpression re(QStringLiteral("^libdev_?v?([0-9][0-9A-Za-z._-]*)\\.zip$"));
+    const auto m = re.match(QFileInfo(fileName).fileName());
+    return m.hasMatch() ? m.captured(1) : QString();
+}
+
+int Platform::compareSdk(const QString &a, const QString &b)
+{
+    static const QRegularExpression nonDigits(QStringLiteral("[^0-9]+"));
+    const auto pa = a.split(nonDigits, Qt::SkipEmptyParts), pb = b.split(nonDigits, Qt::SkipEmptyParts);
+    for (int i = 0; i < std::max(pa.size(), pb.size()); ++i) {
+        const int x = i < pa.size() ? pa[i].toInt() : 0, y = i < pb.size() ? pb[i].toInt() : 0;
+        if (x != y) return x < y ? -1 : 1;
+    }
+    return 0;
+}
+
+void Platform::checkForNewSdk()
+{
+    // Newer than both the SDK Gimbot was built with and the saved one.
+    QString floor = sdkVersion();
+    const QString saved = sdkVersionOf(savedSdk());
+    if (!saved.isEmpty() && compareSdk(saved, floor) > 0) floor = saved;
+    QString bestPath, bestVersion;
+    const QString downloads = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+    QStringList candidates;
+    for (const auto &f : QDir(downloads).entryInfoList({"libdev*.zip"}, QDir::Files)) candidates << f.absoluteFilePath();
+    for (const auto &sub : QDir(downloads).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot))
+        for (const auto &f : QDir(sub.absoluteFilePath()).entryInfoList({"libdev*.zip"}, QDir::Files))
+            candidates << f.absoluteFilePath();
+    for (const auto &path : candidates) {
+        const QString v = sdkVersionOf(path);
+        if (v.isEmpty()) continue;
+        const bool newer = floor == QLatin1String("none") || floor == QLatin1String("unknown") || compareSdk(v, floor) > 0;
+        if (newer && (bestVersion.isEmpty() || compareSdk(v, bestVersion) > 0)) {
+            bestPath = path;
+            bestVersion = v;
+        }
+    }
+    if (bestPath != m_newSdkPath) {
+        m_newSdkPath = bestPath;
+        m_newSdkVersion = bestVersion;
+        if (!bestPath.isEmpty()) qInfo() << "Found a newer OBSBOT SDK:" << bestPath;
+        emit sdkChanged();
+    }
+}
+
+bool Platform::adoptSdk(const QString &pathOrUrl)
+{
+    const QUrl url(pathOrUrl);
+    const QString path = url.isLocalFile() ? url.toLocalFile() : pathOrUrl;
+    const QFileInfo info(path);
+    if (!info.isFile() || sdkVersionOf(info.fileName()).isEmpty()) {
+        emit error(tr("That isn't an OBSBOT SDK zip. It should be named like libdev_v2.1.0_8.zip."));
+        return false;
+    }
+    QDir().mkpath(sdkFolder());
+    const QString target = sdkFolder() + "/" + info.fileName();
+    if (QFileInfo(target).absoluteFilePath() != info.absoluteFilePath()) {
+        QFile::remove(target);
+        if (!QFile::rename(path, target)) { // different drive: copy, then remove
+            if (!QFile::copy(path, target)) {
+                emit error(tr("Couldn't move the SDK into %1.").arg(sdkFolder()));
+                return false;
+            }
+            QFile::remove(path);
+        }
+    }
+    // Keep only the newest.
+    for (const auto &f : QDir(sdkFolder()).entryList({"libdev*.zip"}, QDir::Files))
+        if (f != info.fileName() && compareSdk(sdkVersionOf(f), sdkVersionOf(info.fileName())) <= 0)
+            QFile::remove(sdkFolder() + "/" + f);
+    qInfo() << "Moved the OBSBOT SDK to" << target;
+    emit notice(tr("Moved %1 into Gimbot's folder").arg(info.fileName()));
+    m_newSdkPath.clear();
+    m_newSdkVersion.clear();
+    emit sdkChanged();
+    checkForNewSdk();
+    return true;
+}
+
+void Platform::openSdkFolder()
+{
+    QDir().mkpath(sdkFolder());
+    QDesktopServices::openUrl(QUrl::fromLocalFile(sdkFolder()));
+}
 
 // ---------------------------------------------------------------- crash detection
 
@@ -162,14 +271,20 @@ void Platform::rebuildMenu()
         const bool asleep = v.value("asleep").toBool();
         m_menu->addAction(asleep ? tr("Wake camera") : tr("Sleep camera"), this,
                           [this, asleep] { m_cam->set("asleep", !asleep); });
-        auto *track = m_menu->addMenu(tr("Tracking"));
+        const int mode = v.value("mode").toInt();
+        auto *onOff = m_menu->addAction(tr("Tracking"), m_cam, &Controller::toggleTracking);
+        onOff->setCheckable(true);
+        onOff->setChecked(mode != 0);
+        if (m_cam->trackingPaused()) m_menu->addAction(tr("Resume tracking"), m_cam, &Controller::resumeTracking);
+        auto *track = m_menu->addMenu(tr("Tracking mode"));
         auto *group = new QActionGroup(track);
-        const QList<QPair<QString, int>> modes = {{tr("Off"), 0},        {tr("Person"), 2}, {tr("Group"), 1},
-                                                  {tr("Hand"), 3},       {tr("Desk"), 5},   {tr("Whiteboard"), 4}};
+        const QList<QPair<QString, int>> modes = {{tr("Person"), 2}, {tr("Group"), 1},     {tr("Hand"), 3},
+                                                  {tr("Desk"), 5},   {tr("Whiteboard"), 4}};
+        const int shown = mode != 0 ? mode : v.value("lastTrackingMode").toInt();
         for (const auto &m : modes) {
             auto *a = track->addAction(m.first, this, [this, mode = m.second] { m_cam->set("mode", mode); });
             a->setCheckable(true);
-            a->setChecked(v.value("mode").toInt() == m.second);
+            a->setChecked(shown == m.second);
             group->addAction(a);
         }
         const auto presets = m_cam->presets();
@@ -241,7 +356,18 @@ QString Platform::diagnostics(bool includeSerial) const
     }
     out << QString() << QStringLiteral("Recent log:");
     out << Logger::recent(80);
-    return out.join('\n');
+    QString text = out.join('\n');
+    // Privacy: no home folder, user name or computer name in reports, and
+    // the serial number only when the user ticks the box.
+    const QString home = QDir::homePath();
+    if (home.size() > 1) text.replace(home, QStringLiteral("~"));
+    const QString user = qEnvironmentVariable("USER");
+    if (user.size() > 2) text.replace(QRegularExpression("\\b" + QRegularExpression::escape(user) + "\\b"), "<user>");
+    const QString host = QSysInfo::machineHostName();
+    if (host.size() > 2) text.replace(host, QStringLiteral("<computer>"));
+    const QString serial = m_cam->serial();
+    if (!includeSerial && serial.size() > 3) text.replace(serial, QStringLiteral("<serial>"));
+    return text;
 }
 
 void Platform::copyToClipboard(const QString &text) { QGuiApplication::clipboard()->setText(text); }
@@ -284,4 +410,21 @@ int DBusService::Run(const QStringList &args, QString &output)
     });
     output.clear();
     return 0;
+}
+
+QCameraFormat Platform::previewFormat(const QCameraDevice &device, int targetHeight, int quality) const
+{
+    const QList<QCameraFormat> all = device.videoFormats();
+    std::vector<preview::Format> list;
+    for (const auto &f : all)
+        list.push_back({f.resolution().width(), f.resolution().height(), f.maxFrameRate(),
+                        f.pixelFormat() == QVideoFrameFormat::Format_Jpeg});
+    const int i = preview::choose(list, targetHeight, quality);
+    if (i < 0) return {};
+    qInfo().noquote() << QStringLiteral("Preview format: %1x%2 at %3 fps%4")
+                             .arg(all[i].resolution().width())
+                             .arg(all[i].resolution().height())
+                             .arg(all[i].maxFrameRate())
+                             .arg(list[size_t(i)].compressed ? QStringLiteral(" (MJPEG)") : QString());
+    return all[i];
 }

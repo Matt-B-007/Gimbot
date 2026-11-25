@@ -6,6 +6,7 @@ Button {
     id: control
     property string iconName: ""
     property string tip: ""
+    property string shortcut: ""
     property bool active: false
     property real iconSize: 17
 
@@ -43,11 +44,9 @@ Button {
         }
     }
 
-    ToolTip {
+    Tip {
         visible: control.hovered && control.tip.length > 0
-        delay: 500
         text: control.tip
-        contentItem: Text { text: control.tip; color: Theme.text; font.family: Theme.font; font.pixelSize: Theme.small }
-        background: Rectangle { color: Theme.surface2; radius: 6; border.color: Theme.border }
+        shortcut: control.shortcut
     }
 }

@@ -28,7 +28,7 @@ public:
         s_.antiFlicker = 3;
         image_ = {{ImageParam::Brightness, 50}, {ImageParam::Contrast, 50}, {ImageParam::Saturation, 50},
                   {ImageParam::Sharpness, 50}, {ImageParam::Hue, 50}};
-        presets_ = {{0, "Desk", -5, 0, 1.2f}, {1, "Whiteboard", 0, 35, 1.0f}};
+        presets_ = {{0, "Desk", 12, 0, 1.2f}, {1, "Whiteboard", 0, 35, 1.0f}};
         // Set GIMBOT_FAKE_FAIL=1 to make every command fail, to test errors.
         fail_ = std::getenv("GIMBOT_FAKE_FAIL") != nullptr;
     }
@@ -88,8 +88,9 @@ public:
         yawSpeed_ = yawSpeed;
         return true;
     }
-    bool moveTo(float pitch, float yaw) override
+    bool moveTo(float pitch, float yaw, float speed = 0) override
     {
+        (void)speed; // the simulation arrives instantly
         std::lock_guard<std::mutex> l(m_);
         if (fail_) return false;
         pitchSpeed_ = yawSpeed_ = 0;
@@ -110,6 +111,7 @@ public:
 
     bool setZoom(int p) override { return change([&] { s_.zoomPercent = std::clamp(p, 0, 100); }); }
     bool setZoomSpeed(int) override { return !fail_; }
+    bool setZoomAtSpeed(int p, int) override { return setZoom(p); }
 
     bool setFov(Fov f) override { return change([&] { s_.fov = static_cast<int>(f); }); }
     bool setHdr(bool v) override { return change([&] { s_.hdr = v; }); }

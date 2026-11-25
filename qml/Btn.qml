@@ -9,6 +9,8 @@ Button {
     property string iconName: ""
     property bool pill: false
     property bool compact: false
+    property string tip: ""       // hover explanation
+    property string shortcut: ""  // shown in the hover hint
 
     readonly property color fg: !enabled ? Theme.textFaint
                               : variant === "primary" ? Theme.accentInk
@@ -26,6 +28,7 @@ Button {
     font.weight: variant === "primary" ? Font.DemiBold : Font.Medium
     hoverEnabled: true
     focusPolicy: Qt.StrongFocus
+    Accessible.description: tip
     scale: down ? 0.97 : 1
     Behavior on scale { NumberAnimation { duration: Theme.fast } }
 
@@ -49,6 +52,12 @@ Button {
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
         }
+    }
+
+    Tip {
+        visible: control.hovered && (control.tip.length > 0 || control.shortcut.length > 0)
+        text: control.tip
+        shortcut: control.shortcut
     }
 
     background: Rectangle {

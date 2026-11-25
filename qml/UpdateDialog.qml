@@ -7,7 +7,11 @@ Sheet {
     id: root
     maxWidth: 560
     iconName: "download"
-    title: updater.installState === "done" ? qsTr("Update installed")
+    readonly property bool rebuilding: updater.installAction === "rebuild"
+    title: rebuilding ? (updater.installState === "done" ? qsTr("Rebuilt with the new SDK")
+                         : updater.installState === "failed" ? qsTr("The rebuild didn't finish")
+                         : qsTr("Rebuilding Gimbot with the new OBSBOT SDK"))
+         : updater.installState === "done" ? qsTr("Update installed")
          : updater.installState === "failed" ? qsTr("The update didn't finish")
          : updater.installState === "running" ? qsTr("Updating to Gimbot %1").arg(updater.latestVersion)
          : updater.isSwitch ? qsTr("Switch to Gimbot %1").arg(updater.latestVersion)
@@ -178,7 +182,7 @@ Sheet {
             text: updater.installState === "failed" ? qsTr("Try again") : updater.isSwitch ? qsTr("Switch now") : qsTr("Update now")
             iconName: "download"
             variant: "primary"
-            onClicked: updater.install()
+            onClicked: root.rebuilding ? updater.rebuild() : updater.install()
         },
         Btn {
             visible: updater.installState === "done"

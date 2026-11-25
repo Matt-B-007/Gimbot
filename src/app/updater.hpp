@@ -29,6 +29,7 @@ class Updater : public QObject {
     Q_PROPERTY(QString installStatus READ installStatus NOTIFY installChanged)
     Q_PROPERTY(QString installError READ installError NOTIFY installChanged)
     Q_PROPERTY(QString installLog READ installLog NOTIFY installChanged)
+    Q_PROPERTY(QString installAction READ installAction NOTIFY installChanged) // update rebuild uninstall
 
 public:
     Updater(const QString &repo, const QString &currentVersion, QObject *parent = nullptr);
@@ -48,10 +49,15 @@ public:
     QString installStatus() const { return m_status; }
     QString installError() const { return m_error; }
     QString installLog() const { return m_log; }
+    QString installAction() const { return m_action; }
 
     void setChannel(int channel);
     Q_INVOKABLE void check();
     Q_INVOKABLE void install();
+    // Rebuild the installed version, e.g. with a newer OBSBOT SDK.
+    Q_INVOKABLE void rebuild();
+    // Remove Gimbot; purge also deletes settings, logs and the saved SDK.
+    Q_INVOKABLE void uninstall(bool purge);
     Q_INVOKABLE void cancelInstall();
     Q_INVOKABLE void restartApp();
     // For testing the update screens: --fake runs a pretend update.
@@ -67,6 +73,7 @@ signals:
 private:
     void setState(const QString &s);
     void readOutput();
+    void run(const QString &action, const QStringList &args);
 
     QNetworkAccessManager m_net;
     QTimer m_timer;
@@ -76,7 +83,7 @@ private:
     bool m_beta = false, m_switch = false, m_simulated = false;
 
     QProcess *m_proc = nullptr;
-    QString m_installState = "idle", m_status, m_error, m_log;
+    QString m_installState = "idle", m_status, m_error, m_log, m_action = "update";
     int m_progress = 0;
     QByteArray m_partial;
 };

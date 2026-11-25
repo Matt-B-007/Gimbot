@@ -124,7 +124,24 @@ void Updater::check()
 
 void Updater::install()
 {
+    const QString channel = m_channel == 2 ? "beta" : "stable";
+    run("update", {"--gui", "--channel", channel, "--version", m_tag});
+}
+
+void Updater::rebuild()
+{
+    run("rebuild", {"--gui", "--version", "v" + m_current});
+}
+
+void Updater::uninstall(bool purge)
+{
+    run("uninstall", {"--gui", "--uninstall", purge ? "--purge" : "--keep-data"});
+}
+
+void Updater::run(const QString &action, const QStringList &args)
+{
     if (m_installState == "running") return;
+    m_action = action;
     m_installState = "running";
     m_progress = 0;
     m_status = tr("Starting…");
@@ -143,25 +160,28 @@ void Updater::install()
         if (status == QProcess::NormalExit && code == 0) {
             m_installState = "done";
             m_progress = 100;
-            m_status = tr("Gimbot %1 is installed").arg(m_latest);
-            qInfo() << "Update to" << m_latest << "installed";
+            m_status = m_action == "uninstall" ? tr("Gimbot is uninstalled")
+                       : m_action == "rebuild" ? tr("Gimbot is rebuilt with the new SDK")
+                                               : tr("Gimbot %1 is installed").arg(m_latest);
+            qInfo().noquote() << m_action << "finished";
         } else {
             m_installState = "failed";
             if (m_error.isEmpty())
-                m_error = code == 3 ? tr("The OBSBOT SDK zip wasn't found.") : tr("The update didn't finish.");
-            qWarning() << "Update failed:" << m_error;
+                m_error = code == 3 ? tr("The OBSBOT SDK zip wasn't found.")
+                          : m_action == "uninstall" ? tr("Uninstalling didn't finish.")
+                                                    : tr("The update didn't finish.");
+            qWarning() << m_action << "failed:" << m_error;
         }
         emit installChanged();
     });
 
     if (m_simulated) {
-        // A pretend update for testing the screens.
+        // A pretend run for testing the screens.
         m_proc->start("bash", {"-c", "for p in 5 15 25 40 55 70 85 90 100; do echo \"::progress $p Step $p\"; "
                                      "echo \"log line $p\"; sleep 0.25; done"});
         return;
     }
-    const QString channel = m_channel == 2 ? "beta" : "stable";
-    m_proc->start(m_helper, {"--gui", "--channel", channel, "--version", m_tag});
+    m_proc->start(m_helper, args);
 }
 
 void Updater::readOutput()

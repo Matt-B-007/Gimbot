@@ -58,6 +58,8 @@ QVariantMap rangeMap(const t2::Range &r, long fbMin, long fbMax, long fbDef)
 
 QVariantMap statusToMap(const t2::Status &s)
 {
+    // While the camera switches modes it reports a placeholder; keep showing
+    // the previous mode until it settles (items further down still apply).
     QVariantMap m{{"asleep", s.asleep},
                   {"mode", static_cast<int>(s.mode)},
                   {"framing", s.framing},
@@ -75,6 +77,10 @@ QVariantMap statusToMap(const t2::Status &s)
                   {"audioAutoGain", s.audioAutoGain}};
     for (int i = 0; i < static_cast<int>(t2::Voice::Count); ++i)
         m[QStringLiteral("voice%1").arg(i)] = (s.voiceMask & (1 << i)) != 0;
+    if (s.modeSwitching) {
+        m.remove("mode");
+        m.remove("framing");
+    }
     return m;
 }
 
@@ -113,13 +119,20 @@ Controller::Controller(bool simulated, QObject *parent) : QObject(parent), m_sim
     m_guideLightTimer.setInterval(4000);
     connect(&m_guideLightTimer, &QTimer::timeout, this,
             [this] { call("guide", tr("the guide light"), [](Camera &c) { return c.setGuideLight(false); }); });
+    m_resumeTimer.setSingleShot(true);
+    connect(&m_resumeTimer, &QTimer::timeout, this, [this] {
+        if (m_trackingPaused && m_values["autoResume"].toBool()) resumeTracking();
+    });
 }
 
 Controller::~Controller()
 {
     if (!m_simulated) t2::Discovery::stop();
-    // Release the camera on its own thread before the worker shuts down.
+    // Release the camera on its own thread, and wait for that before any
+    // member is destroyed (m_cam is destroyed before m_worker otherwise,
+    // racing the worker and crashing on quit).
     m_worker.post([this] { m_cam.reset(); });
+    m_worker.stop();
 }
 
 // ---------------------------------------------------------------- settings table
@@ -227,6 +240,15 @@ void Controller::defineSettings()
     // Gimbot's own preferences.
     def("invertPan", Kind::App, false, {});
     def("invertTilt", Kind::App, false, {});
+    def("smoothness", Kind::App, 1, {});        // t2::Smoothness
+    def("lastTrackingMode", Kind::App, 2, {});  // mode the tracking switch turns on
+    def("autoResume", Kind::App, false, {});    // resume tracking after a manual move
+    def("autoResumeSeconds", Kind::App, 5, {});
+    def("previewQuality", Kind::App, 0, {});    // 0 auto (sharpest), 1 720p, 2 1080p, 3 4K
+    def("tourDone", Kind::App, false, {});
+    def("moreAim", Kind::App, false, {});      // "More" sections on the main screen
+    def("moreTracking", Kind::App, false, {});
+    def("moreImage", Kind::App, false, {});
     def("gimbalSpeed", Kind::App, 60, {});
     def("guideLight", Kind::App, true, {});
     def("closeToTray", Kind::App, true, {});
@@ -281,7 +303,22 @@ void Controller::set(const QString &key, const QVariant &value)
         touch(implied.first);
     }
     if (key == "mode") touch("framing");
+
+    if ((key == "mode" || implied.first == "mode") && !m_internalSet) {
+        // The user chose a mode (or turned tracking off) themselves.
+        setPaused(false);
+        const int mode = m_values["mode"].toInt();
+        if (mode != 0 && m_values["lastTrackingMode"].toInt() != mode) {
+            m_values["lastTrackingMode"] = mode;
+            m_settings.setValue("settings/lastTrackingMode", mode);
+        }
+    }
+    if (!m_activeProfile.isEmpty() && !m_internalSet && kProfileKeys.contains(key)) {
+        m_activeProfile.clear();
+        emit activeProfileChanged();
+    }
     emit valuesChanged();
+    if (key == "mirrored" || key == "invertPan" || key == "invertTilt") emit positionChanged();
 
     if (it->kind == Kind::Pushed || it->kind == Kind::App) m_settings.setValue("settings/" + key, v);
     if (it->kind == Kind::App) emit appSettingChanged(key, v);
@@ -327,6 +364,13 @@ void Controller::mergeFromCamera(const QVariantMap &v, bool includeBootMode)
         if (m_values.value(it.key()) != val) {
             m_values[it.key()] = val;
             changed = true;
+            if (it.key() == "mirrored") emit positionChanged();
+            if (it.key() == "mode" && val.toInt() != 0) {
+                // Tracking started on the camera (a gesture, a voice command…).
+                setPaused(false);
+                m_values["lastTrackingMode"] = val;
+                m_settings.setValue("settings/lastTrackingMode", val);
+            }
         }
     }
     if (changed) emit valuesChanged();
@@ -503,61 +547,114 @@ void Controller::pollPosition()
         QMetaObject::invokeMethod(this, [this, ok, p] {
             m_positionPending = false;
             if (!ok) return;
-            if (!qFuzzyCompare(m_pan + 1000, p.yaw + 1000.0) || !qFuzzyCompare(m_tilt + 1000, p.pitch + 1000.0)) {
-                m_pan = p.yaw;
-                m_tilt = p.pitch;
+            if (!qFuzzyCompare(m_yaw + 1000, p.yaw + 1000.0) || !qFuzzyCompare(m_pitch + 1000, p.pitch + 1000.0)) {
+                m_yaw = p.yaw;
+                m_pitch = p.pitch;
                 emit positionChanged();
             }
         });
     });
 }
 
-void Controller::leaveTracking()
+t2::axis::Orientation Controller::orientation() const
 {
-    // AI tracking owns the gimbal; manual moves need it off.
-    if (m_values["mode"].toInt() != 0) set("mode", 0);
+    t2::axis::Orientation o;
+    o.mirrored = m_values["mirrored"].toBool();
+    o.invertPan = m_values["invertPan"].toBool();
+    o.invertTilt = m_values["invertTilt"].toBool();
+    return o;
 }
 
-void Controller::toggleTracking() { set("mode", m_values["mode"].toInt() == 0 ? 2 : 0); }
+double Controller::pan() const { return t2::axis::screenFromYaw(m_yaw, orientation()); }
+double Controller::tilt() const { return t2::axis::screenFromPitch(m_pitch, orientation()); }
+
+float Controller::glide() const
+{
+    return t2::glideSpeed(static_cast<t2::Smoothness>(std::clamp(m_values["smoothness"].toInt(), 0, 3)));
+}
+
+void Controller::setPaused(bool on)
+{
+    if (!on) m_resumeTimer.stop();
+    if (m_trackingPaused == on) return;
+    m_trackingPaused = on;
+    emit trackingPausedChanged();
+}
+
+void Controller::leaveTracking()
+{
+    // AI tracking owns the gimbal; a manual move pauses it. The switch on the
+    // main screen shows it off, with a Resume button next to it.
+    if (m_values["mode"].toInt() != 0) {
+        m_internalSet = true;
+        set("mode", 0);
+        m_internalSet = false;
+        setPaused(true);
+    }
+    if (m_trackingPaused && m_values["autoResume"].toBool())
+        m_resumeTimer.start(std::clamp(m_values["autoResumeSeconds"].toInt(), 1, 60) * 1000);
+}
+
+void Controller::toggleTracking() { setTracking(m_values["mode"].toInt() == 0); }
+
+void Controller::setTracking(bool on)
+{
+    if (!on) setPaused(false); // switched off on purpose, even if it already was
+    const int last = m_values["lastTrackingMode"].toInt();
+    set("mode", on ? (last >= 1 && last <= 5 ? last : 2) : 0);
+}
+
+void Controller::resumeTracking() { setTracking(true); }
 
 void Controller::move(double tilt, double pan)
 {
     leaveTracking();
     const double speed = m_values["gimbalSpeed"].toDouble();
-    const double sx = m_values["invertPan"].toBool() ? -1 : 1, sy = m_values["invertTilt"].toBool() ? -1 : 1;
-    const double pitch = std::clamp(tilt, -1.0, 1.0) * speed * sy;
-    // The SDK's positive yaw turns the camera to its left, which is the
-    // viewer's right in an unmirrored image.
-    const double yaw = -std::clamp(pan, -1.0, 1.0) * speed * sx;
+    const auto o = orientation();
+    const double pitch = t2::axis::pitchFromScreen(std::clamp(tilt, -1.0, 1.0) * speed, o);
+    const double yaw = t2::axis::yawFromScreen(std::clamp(pan, -1.0, 1.0) * speed, o);
     call("move", tr("the gimbal"), [pitch, yaw](Camera &c) { return c.move(pitch, yaw); });
+}
+
+void Controller::nudge(double tilt, double pan)
+{
+    move(tilt, pan);
+    QTimer::singleShot(600, this, [this] { stopMove(); });
 }
 
 void Controller::stopMove()
 {
     call("move", tr("the gimbal"), [](Camera &c) { return c.move(0, 0); });
+    if (m_trackingPaused && m_values["autoResume"].toBool())
+        m_resumeTimer.start(std::clamp(m_values["autoResumeSeconds"].toInt(), 1, 60) * 1000);
 }
 
 void Controller::recenter()
 {
     leaveTracking();
-    call("move", tr("recentering"), [](Camera &c) { return c.recenter(); });
+    const float speed = glide();
+    m_yaw = m_pitch = 0;
+    emit positionChanged();
+    call("move", tr("recentering"), [speed](Camera &c) { return speed > 0 ? c.moveTo(0, 0, speed) : c.recenter(); });
 }
 
 void Controller::aimAt(double x, double y)
 {
     leaveTracking();
-    if (m_values["mirrored"].toBool() != m_values["invertPan"].toBool()) x = 1.0 - x;
-    if (m_values["invertTilt"].toBool()) y = 1.0 - y;
-    call("move", tr("aiming"), [x, y](Camera &c) { return c.aimAt(x, y); });
+    const auto o = orientation();
+    const float speed = glide();
+    call("move", tr("aiming"), [x, y, o, speed](Camera &c) { return c.aimAt(x, y, o, speed); });
 }
 
 void Controller::aimAbsolute(double pan, double tilt)
 {
     leaveTracking();
-    m_pan = pan;
-    m_tilt = tilt;
+    const auto o = orientation();
+    m_yaw = t2::axis::yawFromScreen(pan, o);
+    m_pitch = t2::axis::pitchFromScreen(tilt, o);
     emit positionChanged();
-    call("move", tr("aiming"), [pan, tilt](Camera &c) { return c.moveTo(float(tilt), float(pan)); });
+    const float pitch = float(m_pitch), yaw = float(m_yaw), speed = glide();
+    call("move", tr("aiming"), [pitch, yaw, speed](Camera &c) { return c.moveTo(pitch, yaw, speed); });
 }
 
 void Controller::zoomBy(int delta) { set("zoom", std::clamp(m_values["zoom"].toInt() + delta, 0, 100)); }
@@ -641,7 +738,10 @@ void Controller::updatePreset(int id)
 void Controller::goToPreset(int id)
 {
     leaveTracking();
-    call("move", tr("the preset"), [id](Camera &c) { return c.goToPreset(id); });
+    const auto level = static_cast<t2::Smoothness>(std::clamp(m_values["smoothness"].toInt(), 0, 3));
+    const float speed = t2::glideSpeed(level);
+    const int zoomSpeed = t2::glideZoomSpeed(level);
+    call("move", tr("the preset"), [id, speed, zoomSpeed](Camera &c) { return c.glideToPreset(id, speed, zoomSpeed); });
 }
 
 void Controller::goToPresetIndex(int index)
@@ -714,8 +814,35 @@ void Controller::startup(const QString &action)
     }
 }
 
+void Controller::snapshotForUndo(const QStringList &keys, const QString &message)
+{
+    m_undo.clear();
+    m_undoProfile.clear();
+    for (const auto &k : keys) m_undo[k] = m_values.value(k);
+    emit undoAvailable(message);
+}
+
+void Controller::undo()
+{
+    if (!m_undoProfile.isEmpty()) {
+        m_settings.setValue("profiles/" + m_undoProfile, m_undoProfileData);
+        m_undoProfile.clear();
+        emit profilesChanged();
+        return;
+    }
+    const QVariantMap restore = m_undo;
+    m_undo.clear();
+    // Mode last, as when applying a profile.
+    for (auto it = restore.cbegin(); it != restore.cend(); ++it)
+        if (it.key() != "mode") set(it.key(), it.value());
+    if (restore.contains("mode")) set("mode", restore.value("mode"));
+}
+
 void Controller::resetImage()
 {
+    snapshotForUndo({"brightness", "contrast", "saturation", "sharpness", "hue", "wbMode", "wbKelvin", "exposureAuto",
+                     "shutter", "hdr", "faceExposure", "autoFocus", "manualFocus"},
+                    tr("Image settings reset"));
     for (const char *k : {"brightness", "contrast", "saturation", "sharpness", "hue"})
         set(k, m_ranges.value(k).toMap().value("def").toInt());
     set("wbMode", 0);
@@ -723,7 +850,19 @@ void Controller::resetImage()
     set("hdr", false);
     set("faceExposure", false);
     set("autoFocus", true);
-    emit notice(tr("Image settings reset"));
+}
+
+void Controller::resetTracking()
+{
+    snapshotForUndo({"framing", "trackStyle", "fov", "autoZoom"}, tr("Tracking settings reset"));
+    m_internalSet = true; // keep tracking as it is
+    if (m_values["mode"].toInt() == 2) set("framing", 1);
+    else m_values["framing"] = 1;
+    m_internalSet = false;
+    set("trackStyle", 0);
+    set("fov", 0);
+    set("autoZoom", true);
+    emit valuesChanged();
 }
 
 void Controller::factoryReset()
@@ -771,17 +910,28 @@ void Controller::applyProfile(const QString &name)
 {
     const QVariantMap snap = m_settings.value("profiles/" + name).toMap();
     if (snap.isEmpty()) return;
+    snapshotForUndo(kProfileKeys, tr("Applied profile “%1”").arg(name));
     // Mode last, so framing doesn't switch tracking on when the profile has it off.
     for (const auto &k : kProfileKeys)
         if (k != "mode" && snap.contains(k)) set(k, snap.value(k));
     if (snap.contains("mode")) set("mode", snap.value("mode"));
-    emit notice(tr("Applied profile “%1”").arg(name));
+    m_activeProfile = name;
+    emit activeProfileChanged();
 }
 
 void Controller::deleteProfile(const QString &name)
 {
+    const QVariantMap data = m_settings.value("profiles/" + name).toMap();
     m_settings.remove("profiles/" + name);
+    if (m_activeProfile == name) {
+        m_activeProfile.clear();
+        emit activeProfileChanged();
+    }
     emit profilesChanged();
+    m_undo.clear();
+    m_undoProfile = name;
+    m_undoProfileData = data;
+    emit undoAvailable(tr("Deleted profile “%1”").arg(name));
 }
 
 bool Controller::exportProfiles(const QUrl &file)

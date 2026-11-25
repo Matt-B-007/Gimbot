@@ -35,9 +35,9 @@ namespace wb {
 constexpr int Auto = 0, Daylight = 1, Fluorescent = 2, Tungsten = 3, Cloudy = 10, Manual = 255;
 }
 
-// Shutter speeds, matching DevShutterTimeType: 9 = 1/8000 ... 46 = 1/2.
+// Shutter speeds, matching DevShutterTimeType: 9 = 1/8000 ... 45 = 1/2.
 namespace shutter {
-constexpr int First = 9, Last = 46;
+constexpr int First = 9, Last = 45;
 const char *label(int value); // "1/60" etc.
 }
 
@@ -48,6 +48,7 @@ enum class VoiceLanguage : int { Chinese = 0, English = 1 };
 struct Status {
     bool valid = false;
     Mode mode = Mode::Off;
+    bool modeSwitching = false; // the camera is changing modes; `mode` is not meaningful
     int framing = 0;          // AiSubModeType
     int zoomPercent = 0;      // 0..100
     bool hdr = false;
@@ -82,11 +83,55 @@ struct GimbalPos {
     float pitch = 0, yaw = 0;
 };
 
-// Region-limited tracking. Yaw: right is positive as you face the camera.
-// Pitch: down is positive.
+// Region-limited tracking, in the SDK's angle frame (see `axis` below).
 struct Zone {
     float yawMin = -120, yawMax = 120, pitchMin = -90, pitchMax = 90;
 };
+
+// ---------------------------------------------------------------- directions
+//
+// The one place that decides which way is up. Every control (arrow keys, the
+// aim dial, click-to-aim, drag-to-steer, presets, the tracking-area editor)
+// converts through these functions, so they can't disagree with each other.
+//
+// SDK frame, as OBSBOT documents it for the Tiny 2's angle calls:
+//   pitch: positive tilts the camera DOWN
+//   yaw:   positive turns it to the RIGHT as seen by someone facing the camera
+//          (the camera's own left)
+// Screen frame, what the user sees in the preview:
+//   up:    positive moves the picture's view up
+//   right: positive moves the picture's view right
+// In an unmirrored picture, turning the camera to its own right shows more
+// of what is on the picture's right, so screen-right is negative yaw. A
+// mirrored picture flips that. The invert options are a per-user override.
+namespace axis {
+struct Orientation {
+    bool mirrored = false;   // the camera's horizontal flip is on
+    bool invertPan = false;  // user override
+    bool invertTilt = false; // user override
+};
+constexpr double kPitchPerUp = -1.0;    // SDK pitch per unit of screen "up"
+constexpr double kYawPerRight = -1.0;   // SDK yaw per unit of screen "right", unmirrored
+inline double yawSign(const Orientation &o)
+{
+    double s = kYawPerRight;
+    if (o.mirrored) s = -s;
+    if (o.invertPan) s = -s;
+    return s;
+}
+inline double pitchSign(const Orientation &o) { return o.invertTilt ? -kPitchPerUp : kPitchPerUp; }
+// Both directions use the same sign, so these work for angles and speeds.
+inline double yawFromScreen(double right, const Orientation &o) { return yawSign(o) * right; }
+inline double pitchFromScreen(double up, const Orientation &o) { return pitchSign(o) * up; }
+inline double screenFromYaw(double yaw, const Orientation &o) { return yawSign(o) * yaw; }
+inline double screenFromPitch(double pitch, const Orientation &o) { return pitchSign(o) * pitch; }
+} // namespace axis
+
+// How fast the gimbal glides to a new position. Fast = the camera's own
+// maximum, the others use a reference speed in degrees per second.
+enum class Smoothness : int { Fast = 0, Normal = 1, Smooth = 2, Cinematic = 3 };
+float glideSpeed(Smoothness s);    // deg/s, 0 = camera maximum
+int glideZoomSpeed(Smoothness s);  // 1..10, 0 = camera default
 
 class Camera {
 public:
@@ -132,16 +177,22 @@ public:
 
     // Gimbal
     virtual bool move(double pitchSpeed, double yawSpeed) = 0; // deg/s; 0,0 stops
-    virtual bool moveTo(float pitch, float yaw) = 0;
+    // Go to angles in the SDK frame. speed is deg/s, 0 = as fast as possible.
+    virtual bool moveTo(float pitch, float yaw, float speed = 0) = 0;
     virtual bool recenter() = 0;
     virtual bool position(GimbalPos &out) const = 0;
     virtual bool setYawReverse(bool on) = 0;
-    // Point the camera at a spot in the current frame (0..1 from top-left).
-    bool aimAt(double x, double y);
+    // Point the camera at a spot in the picture (0..1 from top-left, as seen
+    // in the preview).
+    bool aimAt(double x, double y, const axis::Orientation &o, float speed = 0);
+    // Go to a preset by gliding angle and zoom together, instead of the
+    // camera's own jump. speed 0 uses the camera's preset recall.
+    bool glideToPreset(int id, float speed, int zoomSpeed);
 
     // Zoom
     virtual bool setZoom(int percent) = 0;   // 0..100 of the camera's range
     virtual bool setZoomSpeed(int speed) = 0; // 0 = camera default, 1..10
+    virtual bool setZoomAtSpeed(int percent, int speed) = 0; // one-off speed
 
     // Image
     virtual bool setFov(Fov fov) = 0;

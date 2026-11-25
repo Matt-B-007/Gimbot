@@ -7,6 +7,7 @@ FocusScope {
     id: root
     property bool windowVisible: true
     property bool updateDismissed: false
+    property bool sdkDismissed: false
     signal openPalette()
     signal openSettings()
     signal openReport()
@@ -14,16 +15,53 @@ FocusScope {
     signal savePreset()
     signal renamePreset(int id, string name)
     signal deletePreset(int id, string name)
+    signal openProfiles()
+    signal saveProfile()
+    signal openTour()
+    signal openAbout()
+    signal openSection(string section)
 
     readonly property alias preview: preview
     readonly property bool wide: width >= 1080
 
-    // Hold an arrow key to move the gimbal; let go to stop.
+    readonly property alias tourTargets: tourTargets
+    QtObject {
+        id: tourTargets
+        property Item tracking: trackingCard
+        property Item preview: preview
+        property Item presets: presetStrip
+        property Item bar: topBar
+    }
+
+    // Hold an arrow key to move the gimbal; let go to stop. The speed eases
+    // in and out according to the Movement setting, so it doesn't jerk.
     property int heldTilt: 0
     property int heldPan: 0
-    function updateMove() {
-        if (heldTilt === 0 && heldPan === 0) cam.stopMove()
-        else cam.move(heldTilt, heldPan)
+    property real curTilt: 0
+    property real curPan: 0
+    function updateMove() { if (!easeTimer.running) { easeTimer.start(); easeTimer.triggered() } }
+    onActiveFocusChanged: if (!activeFocus && (heldTilt !== 0 || heldPan !== 0)) { heldTilt = 0; heldPan = 0; updateMove() }
+    Timer {
+        id: easeTimer
+        interval: 40
+        repeat: true
+        function approach(cur, target, up, down) {
+            const r = target === 0 || Math.sign(target) !== Math.sign(cur) && cur !== 0 ? down : up
+            return cur + Math.max(-r, Math.min(r, target - cur))
+        }
+        onTriggered: {
+            const level = Math.max(0, Math.min(3, cam.values.smoothness))
+            const up = [1, 0.25, 0.12, 0.07][level]   // share of full speed added per tick
+            const down = [1, 0.34, 0.18, 0.1][level]
+            root.curTilt = approach(root.curTilt, root.heldTilt, up, down)
+            root.curPan = approach(root.curPan, root.heldPan, up, down)
+            if (root.curTilt === 0 && root.curPan === 0) {
+                stop()
+                cam.stopMove()
+            } else {
+                cam.move(root.curTilt, root.curPan)
+            }
+        }
     }
     Keys.onPressed: (e) => {
         if (e.isAutoRepeat) { e.accepted = [Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right].includes(e.key); return }
@@ -56,9 +94,24 @@ FocusScope {
         spacing: 14
 
         TopBar {
+            id: topBar
             Layout.fillWidth: true
             onOpenPalette: root.openPalette()
             onOpenSettings: root.openSettings()
+            onOpenProfiles: root.openSection("profiles")
+            onSaveProfile: root.saveProfile()
+            onOpenTour: root.openTour()
+            onOpenReport: root.openReport()
+            onOpenAbout: root.openAbout()
+        }
+
+        StatusStrip {
+            Layout.fillWidth: true
+            previewError: preview.error
+            videoSize: preview.videoSize
+            videoFps: preview.videoFps
+            onRetryPreview: preview.retry()
+            onOpenArea: root.openSection("area")
         }
 
         Banner {
@@ -99,6 +152,18 @@ FocusScope {
             }
             onDismissed: root.updateDismissed = true
         }
+        Banner { // a newer OBSBOT SDK was found in Downloads
+            Layout.fillWidth: true
+            visible: platform.newSdkPath.length > 0 && !root.sdkDismissed && updater.installState === "idle"
+            iconName: "download"
+            tint: Theme.accent
+            text: qsTr("A newer OBSBOT SDK (%1) is in your Downloads. Move it into Gimbot's folder and rebuild Gimbot with it?").arg(platform.newSdkVersion)
+            actionText: updater.canInstall ? qsTr("Move and rebuild") : qsTr("Move it")
+            onAction: {
+                if (platform.adoptSdk(platform.newSdkPath) && updater.canInstall) updater.rebuild()
+            }
+            onDismissed: root.sdkDismissed = true
+        }
 
         ScrollView {
             id: scroller
@@ -125,6 +190,7 @@ FocusScope {
                         windowVisible: root.windowVisible && root.visible
                     }
                     PresetStrip {
+                        id: presetStrip
                         Layout.fillWidth: true
                         onSaveRequested: root.savePreset()
                         onRenameRequested: (id, name) => root.renamePreset(id, name)
@@ -138,8 +204,13 @@ FocusScope {
                     Layout.preferredWidth: root.wide ? 340 : -1
                     Layout.maximumWidth: root.wide ? 360 : 100000
                     spacing: 12
+                    TrackingCard {
+                        id: trackingCard
+                        Layout.fillWidth: true
+                        onOpenArea: root.openSection("area")
+                        onOpenVoice: root.openSection("voice")
+                    }
                     AimCard { Layout.fillWidth: true }
-                    TrackingCard { Layout.fillWidth: true }
                     ImageCard { Layout.fillWidth: true }
                     RowLayout {
                         Layout.fillWidth: true
@@ -153,10 +224,12 @@ FocusScope {
                             Layout.fillWidth: true
                         }
                         Text {
-                            text: qsTr("Firmware updates via OBSBOT Center")
+                            text: qsTr("Firmware updates: OBSBOT Center")
                             color: Theme.textFaint
                             font.family: Theme.font
                             font.pixelSize: Theme.small
+                            HoverHandler { id: fwHover }
+                            Tip { visible: fwHover.hovered; text: qsTr("The OBSBOT SDK can't update the camera's firmware. Use OBSBOT Center on Windows or macOS.") }
                         }
                     }
                 }
