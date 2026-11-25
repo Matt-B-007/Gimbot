@@ -689,7 +689,22 @@ Rectangle {
                                  : updater.state === "upToDate" ? qsTr("You're up to date (%1)").arg(platform.version)
                                  : updater.state === "error" ? qsTr("Couldn't check for updates")
                                  : qsTr("Current version: %1").arg(platform.version)
-                            description: updater.lastChecked.length > 0 ? qsTr("Last checked %1").arg(updater.lastChecked) : ""
+                            description: {
+                                let d = []
+                                if (updater.state === "error") d.push(updater.checkError)
+                                else if (updater.usedDnsFallback)
+                                    d.push(qsTr("This computer's DNS isn't working, so Gimbot checked through a public DNS service. Other apps may not connect."))
+                                if (updater.lastChecked.length > 0) d.push(qsTr("Last checked %1").arg(updater.lastChecked))
+                                return d.join("\n")
+                            }
+                            Btn {
+                                visible: (updater.state === "error" && updater.checkError.indexOf("DNS") >= 0) || updater.usedDnsFallback
+                                text: qsTr("How to fix")
+                                iconName: "external"
+                                variant: "ghost"
+                                compact: true
+                                onClicked: platform.openUrl(platform.repoUrl + "#cant-reach-github")
+                            }
                             Btn {
                                 visible: updater.state === "available"
                                 text: updater.canInstall ? (updater.isSwitch ? qsTr("Switch now") : qsTr("Update now")) : qsTr("What's new")
@@ -698,7 +713,7 @@ Rectangle {
                                 compact: true
                                 onClicked: updater.canInstall ? root.openUpdate() : platform.openUrl(updater.latestUrl)
                             }
-                            Btn { text: qsTr("Check now"); iconName: "refresh"; compact: true; enabled: updater.state !== "checking"; onClicked: updater.check() }
+                            Btn { text: updater.state === "error" ? qsTr("Try again") : qsTr("Check now"); iconName: "refresh"; compact: true; enabled: updater.state !== "checking"; onClicked: updater.check() }
                         }
 
                         Label2 { text: qsTr("Help"); Layout.topMargin: 8 }

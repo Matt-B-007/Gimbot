@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 project(gimbot VERSION 0.1.0 LANGUAGES CXX)
 # The full version, including any pre-release part. project() only accepts
 # numbers, so this is what the app, the installer and the package use.
-set(GIMBOT_VERSION "0.1.0-beta.4")
+set(GIMBOT_VERSION "0.1.0-beta.5")
 if(NOT GIMBOT_VERSION MATCHES "^${PROJECT_VERSION}(-[0-9A-Za-z.]+)?$")
     message(FATAL_ERROR "GIMBOT_VERSION (${GIMBOT_VERSION}) must start with the project version (${PROJECT_VERSION})")
 endif()
@@ -103,12 +103,19 @@ if(BUILD_GUI)
     qt_standard_project_setup()
 
     set(GIMBOT_HAVE_KF6 OFF)
+    set(GIMBOT_KDE_STATUS "turned off when built (WITH_KDE=OFF)") # shown in bug reports
     if(WITH_KDE)
         # Each framework ships its own CMake package (KF6CoreAddons, ...).
+        set(_kf_missing "")
         foreach(_kf IN ITEMS CoreAddons Crash GlobalAccel StatusNotifierItem)
             find_package(KF6${_kf} 6.0 QUIET CONFIG)
+            if(KF6${_kf}_FOUND)
+                message(STATUS "Found KF6${_kf} ${KF6${_kf}_VERSION}")
+            else()
+                list(APPEND _kf_missing "KF6${_kf}")
+            endif()
         endforeach()
-        if(KF6CoreAddons_FOUND AND KF6Crash_FOUND AND KF6GlobalAccel_FOUND AND KF6StatusNotifierItem_FOUND)
+        if(NOT _kf_missing)
             # Compile a small program that makes exactly the KDE calls Gimbot
             # makes. If this system's KDE Frameworks differ, build without the
             # integration instead of failing.
@@ -116,6 +123,7 @@ if(BUILD_GUI)
             set(CMAKE_REQUIRED_LIBRARIES KF6::CoreAddons KF6::Crash KF6::GlobalAccel KF6::StatusNotifierItem
                                          Qt6::Widgets)
             set(CMAKE_REQUIRED_FLAGS "-std=c++20 -fPIC")
+            unset(GIMBOT_KF6_WORKS CACHE) # re-test on every configure, so a fixed system is noticed
             check_cxx_source_compiles([=[
                 #include <KAboutData>
                 #include <KCrash>
@@ -150,15 +158,19 @@ if(BUILD_GUI)
             unset(CMAKE_REQUIRED_FLAGS)
             if(GIMBOT_KF6_WORKS)
                 set(GIMBOT_HAVE_KF6 ON)
+                set(GIMBOT_KDE_STATUS "KF6 ${KF6CoreAddons_VERSION}")
             else()
+                set(GIMBOT_KDE_STATUS "KDE Frameworks found, but the test program didn't build")
                 message(WARNING "KDE Frameworks found, but the test program didn't build; continuing without KDE integration. "
                                 "See CMakeFiles/CMakeConfigureLog.yaml for why.")
             endif()
         else()
-            message(STATUS "KDE Frameworks not found (need KF6CoreAddons, KF6Crash, KF6GlobalAccel, KF6StatusNotifierItem)")
+            list(JOIN _kf_missing ", " _kf_missing_text)
+            set(GIMBOT_KDE_STATUS "missing when built: ${_kf_missing_text}")
+            message(STATUS "KDE Frameworks not found: ${_kf_missing_text}")
         endif()
     endif()
-    message(STATUS "KDE Frameworks integration: ${GIMBOT_HAVE_KF6}")
+    message(STATUS "KDE Frameworks integration: ${GIMBOT_HAVE_KF6} (${GIMBOT_KDE_STATUS})")
 
     qt_add_executable(gimbot
         src/app/main.cpp
@@ -205,7 +217,8 @@ if(BUILD_GUI)
     target_compile_definitions(gimbot PRIVATE
         GIMBOT_VERSION="${GIMBOT_VERSION}"
         GIMBOT_SDK_VERSION="${GIMBOT_SDK_VERSION}"
-        GIMBOT_REPO="${GIMBOT_REPO}")
+        GIMBOT_REPO="${GIMBOT_REPO}"
+        GIMBOT_KDE_STATUS="${GIMBOT_KDE_STATUS}")
     target_compile_options(gimbot PRIVATE -Wall -Wextra -Wno-unused-parameter)
     if(GIMBOT_HAVE_KF6)
         target_link_libraries(gimbot PRIVATE KF6::CoreAddons KF6::Crash KF6::GlobalAccel KF6::StatusNotifierItem)

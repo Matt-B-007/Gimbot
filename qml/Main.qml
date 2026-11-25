@@ -56,6 +56,7 @@ ApplicationWindow {
         if (name === "about") about.open()
         if (name === "update") updateDialog.open()
         if (name === "updating") updater.install()
+        if (name === "update-error") { updater.simulateCheckError(); window.openSettings("app") }
         if (name === "tour") { tour.open(); tour.step = 1 }
         if (name === "directions") directionCheck.open()
         if (name === "uninstall") uninstallDialog.open()
@@ -73,6 +74,13 @@ ApplicationWindow {
         }
     }
 
+    Connections {
+        target: updater
+        // Only when the user asked; automatic checks fail quietly and retry.
+        function onCheckFailed(message, manual) {
+            if (manual) toasts.show(qsTr("Couldn't check for updates"), "error", qsTr("Details"), () => window.openSettings("app"))
+        }
+    }
     Connections {
         target: platform
         function onShowRequested() { window.bringForward() }

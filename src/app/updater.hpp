@@ -22,6 +22,10 @@ class Updater : public QObject {
     Q_PROPERTY(bool latestIsBeta READ latestIsBeta NOTIFY changed)
     Q_PROPERTY(bool isSwitch READ isSwitch NOTIFY changed) // going from a beta back to a normal release
     Q_PROPERTY(QString lastChecked READ lastChecked NOTIFY changed)
+    // Why the last check failed, in plain words (empty when it worked).
+    Q_PROPERTY(QString checkError READ checkError NOTIFY changed)
+    // The computer's DNS failed and the check went through a public DNS service.
+    Q_PROPERTY(bool usedDnsFallback READ usedDnsFallback NOTIFY changed)
 
     Q_PROPERTY(bool canInstall READ canInstall CONSTANT)
     Q_PROPERTY(QString installState READ installState NOTIFY installChanged) // idle running done failed
@@ -42,6 +46,8 @@ public:
     bool latestIsBeta() const { return m_beta; }
     bool isSwitch() const { return m_switch; }
     QString lastChecked() const { return m_lastChecked; }
+    QString checkError() const { return m_checkError; }
+    bool usedDnsFallback() const { return m_dnsFallback; }
 
     bool canInstall() const { return m_simulated || (!m_helper.isEmpty() && configured()); }
     QString installState() const { return m_installState; }
@@ -52,7 +58,11 @@ public:
     QString installAction() const { return m_action; }
 
     void setChannel(int channel);
+    // A check the user asked for (a button). Automatic checks use autoCheck().
     Q_INVOKABLE void check();
+    void autoCheck();
+    // For the screenshot tour: pretend the check failed because of DNS.
+    Q_INVOKABLE void simulateCheckError();
     Q_INVOKABLE void install();
     // Rebuild the installed version, e.g. with a newer OBSBOT SDK.
     Q_INVOKABLE void rebuild();
@@ -67,6 +77,8 @@ public:
     static int compareVersions(const QString &a, const QString &b);
 
 signals:
+    // A check failed. manual: the user asked for it, so tell them right away.
+    void checkFailed(const QString &message, bool manual);
     void changed();
     void installChanged();
 
@@ -74,6 +86,10 @@ private:
     void setState(const QString &s);
     void readOutput();
     void run(const QString &action, const QStringList &args);
+    void startCheck(bool manual);
+    void checkWithCurl(int dohIndex); // fallback when the computer's DNS fails
+    void handleReleases(const QByteArray &json);
+    void fail(const QString &message);
 
     QNetworkAccessManager m_net;
     QTimer m_timer;
@@ -81,6 +97,12 @@ private:
     int m_channel = 1;
     QString m_state = "idle", m_latest, m_tag, m_url, m_notes, m_lastChecked;
     bool m_beta = false, m_switch = false, m_simulated = false;
+    QString m_checkError;
+    bool m_dnsFallback = false;
+    bool m_manual = false;      // the check in progress was asked for
+    qint64 m_lastAttempt = 0;   // ms since epoch
+    int m_failures = 0;         // in a row, for backing off
+    QTimer m_retry;
 
     QProcess *m_proc = nullptr;
     QString m_installState = "idle", m_status, m_error, m_log, m_action = "update";

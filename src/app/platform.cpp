@@ -340,7 +340,10 @@ QString Platform::diagnostics(bool includeSerial) const
     QStringList out;
     out << QStringLiteral("Gimbot %1 (OBSBOT SDK %2, Qt %3, built with Qt %4)")
                .arg(version(), sdkVersion(), qtVersion(), QStringLiteral(QT_VERSION_STR));
-    out << QStringLiteral("KDE integration: %1").arg(kdeIntegration() ? "yes" : "no");
+#ifndef GIMBOT_KDE_STATUS
+#define GIMBOT_KDE_STATUS "unknown"
+#endif
+    out << QStringLiteral("KDE integration: %1 (%2)").arg(kdeIntegration() ? "yes" : "no", QStringLiteral(GIMBOT_KDE_STATUS));
     out << QStringLiteral("System: %1").arg(system());
     if (m_cam->connected()) {
         out << QStringLiteral("Camera: %1, firmware %2%3")

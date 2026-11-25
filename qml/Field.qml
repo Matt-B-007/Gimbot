@@ -4,6 +4,7 @@ import QtQuick.Controls
 // Single-line text input.
 TextField {
     id: control
+    Accessible.name: placeholderText
     implicitHeight: 40
     leftPadding: 12
     rightPadding: 12

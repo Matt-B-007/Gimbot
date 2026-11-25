@@ -4,6 +4,10 @@ import QtQuick.Controls
 // Drop-down list.
 ComboBox {
     id: control
+    // Inside a SettingRow, screen readers use the row's label.
+    property string accessibleName: ""
+    Accessible.name: accessibleName.length > 0 ? accessibleName
+                   : (parent && parent.parent && parent.parent.label !== undefined ? parent.parent.label : displayText)
     implicitHeight: 38
     implicitWidth: 220
     font.family: Theme.font

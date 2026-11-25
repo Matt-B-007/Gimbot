@@ -28,6 +28,7 @@ Button {
     font.weight: variant === "primary" ? Font.DemiBold : Font.Medium
     hoverEnabled: true
     focusPolicy: Qt.StrongFocus
+    Accessible.name: text.length > 0 ? text : tip
     Accessible.description: tip
     scale: down ? 0.97 : 1
     Behavior on scale { NumberAnimation { duration: Theme.fast } }

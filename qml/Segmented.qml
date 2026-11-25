@@ -22,7 +22,8 @@ Rectangle {
     border.width: onVideo ? 1 : 0
     border.color: Qt.rgba(1, 1, 1, 0.1)
     Accessible.role: Accessible.PageTabList
-    Accessible.name: accessibleName
+    Accessible.name: accessibleName.length > 0 ? accessibleName
+                   : (parent && parent.parent && parent.parent.label !== undefined ? parent.parent.label : "")
 
     Rectangle {
         id: highlight

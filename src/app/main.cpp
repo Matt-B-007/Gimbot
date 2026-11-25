@@ -182,7 +182,7 @@ int main(int argc, char *argv[])
                                    "settings:device", "palette", "report", "about", "connect", "tour",
                                    "directions", "uninstall", "studio-dark", "settings:voice-dark",
                                    "settings:area-dark", "report-dark", "connect-dark", "update", "updating",
-                                   "updated", "small", "small-dark"};
+                                   "updated", "update-error", "small", "small-dark"};
         auto index = std::make_shared<int>(0);
         auto *timer = new QTimer(&app);
         timer->setInterval(1400);
