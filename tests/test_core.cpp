@@ -189,8 +189,9 @@ private slots:
         // Auto: the smallest smooth format that covers the preview, never below 720p.
         QCOMPARE(preview::choose(tiny2, 400, 0), 1);   // 720p30
         QCOMPARE(preview::choose(tiny2, 900, 0), 7);   // 1080p60 beats 1080p30
-        QCOMPARE(preview::choose(tiny2, 1500, 0), 5);  // 4K30
-        QCOMPARE(preview::choose(tiny2, 5000, 0), 5);  // nothing covers it: the largest
+        QCOMPARE(preview::choose(tiny2, 1500, 0), 7);  // Auto stops at 1080p (60 fps), never 4K
+        QCOMPARE(preview::choose(tiny2, 5000, 0), 7);
+        QCOMPARE(preview::choose({{1280, 720, 30, true}}, 1500, 0), 0); // nothing bigger: what there is
         // Fixed choices skip slow raw modes.
         QCOMPARE(preview::choose(tiny2, 400, 2), 7);
         QCOMPARE(preview::choose(tiny2, 400, 3), 5);

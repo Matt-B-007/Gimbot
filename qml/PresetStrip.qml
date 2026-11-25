@@ -2,7 +2,8 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Preset cards with thumbnails, plus "Save this view".
+// Preset cards with thumbnails, plus "Save this view". Drag a card (or use
+// its menu) to reorder; the drop-down picks where the camera starts.
 ColumnLayout {
     id: root
     signal saveRequested()
@@ -22,18 +23,49 @@ ColumnLayout {
             font.pixelSize: Theme.large - 1
             font.weight: Font.DemiBold
         }
-        Item { Layout.fillWidth: true }
         Text {
-            text: qsTr("Click to go · right-click for options")
+            text: qsTr("Click to go · drag to reorder · right-click for options")
             color: Theme.textMuted
             font.family: Theme.font
             font.pixelSize: Theme.small
+            elide: Text.ElideRight
+            Layout.fillWidth: true
+            Layout.leftMargin: 8
+        }
+        Text {
+            text: qsTr("Camera starts at")
+            color: Theme.textMuted
+            font.family: Theme.font
+            font.pixelSize: Theme.small + 1
+        }
+        Select {
+            id: startSelect
+            implicitWidth: 170
+            readonly property var ids: [-1].concat(cam.presets.map((p) => p.id))
+            model: [qsTr("Straight ahead")].concat(cam.presets.map((p) => p.name))
+            currentIndex: ids.indexOf(cam.values.startupPreset)
+            displayText: currentIndex < 0 ? qsTr("Where it was set") : currentText
+            enabled: cam.connected
+            accessibleName: qsTr("Where the camera points when it turns on")
+            onActivated: (i) => cam.setStartupPreset(ids[i])
+            Tip {
+                visible: startSelect.hovered && !startSelect.popup.visible
+                text: qsTr("Where the camera points when it turns on. Choosing a preset moves the camera there to save it.")
+            }
         }
     }
 
     GridLayout {
+        id: grid
         Layout.fillWidth: true
         columns: 4
+        // Which slot a point (in grid coordinates) falls in.
+        function slotAt(x, y) {
+            const col = Math.max(0, Math.min(3, Math.floor(x / (root.cardWidth + columnSpacing))))
+            const row = Math.max(0, Math.floor(y / (root.cardHeight + rowSpacing)))
+            return Math.min(cam.presets.length - 1, row * 4 + col)
+        }
+        property int dropSlot: -1
         columnSpacing: 12
         rowSpacing: 12
 
@@ -49,6 +81,31 @@ ColumnLayout {
                 corner: 14
                 Accessible.name: qsTr("Go to preset %1").arg(modelData.name)
                 onClicked: cam.goToPreset(modelData.id)
+                // Drag to reorder.
+                z: drag.active ? 10 : 0
+                opacity: drag.active ? 0.85 : 1
+                transform: Translate { x: drag.active ? drag.activeTranslation.x : 0; y: drag.active ? drag.activeTranslation.y : 0 }
+                DragHandler {
+                    id: drag
+                    target: null
+                    enabled: cam.presets.length > 1
+                    onCentroidChanged: if (active) {
+                        const p = grid.mapFromItem(card, centroid.position.x, centroid.position.y)
+                        grid.dropSlot = grid.slotAt(p.x, p.y)
+                    }
+                    onActiveChanged: {
+                        if (!active && grid.dropSlot >= 0) cam.movePreset(card.modelData.id, grid.dropSlot)
+                        grid.dropSlot = -1
+                    }
+                }
+                Rectangle { // where it will land
+                    anchors.fill: parent
+                    radius: 14
+                    color: "transparent"
+                    border.width: 2
+                    border.color: Theme.accent
+                    visible: grid.dropSlot === card.modelData.index && !drag.active
+                }
                 TapHandler {
                     acceptedButtons: Qt.RightButton
                     onTapped: menu.popup()
@@ -107,6 +164,9 @@ ColumnLayout {
                     id: menu
                     Action { text: qsTr("Update to current view"); onTriggered: cam.updatePreset(card.modelData.id) }
                     Action { text: qsTr("Rename…"); onTriggered: root.renameRequested(card.modelData.id, card.modelData.name) }
+                    Action { text: qsTr("Move left"); enabled: card.modelData.index > 0; onTriggered: cam.movePreset(card.modelData.id, card.modelData.index - 1) }
+                    Action { text: qsTr("Move right"); enabled: card.modelData.index < cam.presets.length - 1; onTriggered: cam.movePreset(card.modelData.id, card.modelData.index + 1) }
+                    Action { text: qsTr("Start here when the camera turns on"); onTriggered: cam.setStartupPreset(card.modelData.id) }
                     Action { text: qsTr("Delete"); onTriggered: root.deleteRequested(card.modelData.id, card.modelData.name) }
                 }
             }

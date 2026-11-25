@@ -14,6 +14,7 @@ RowLayout {
     signal openTour()
     signal openReport()
     signal openAbout()
+    signal openShortcuts()
     spacing: 10
     readonly property bool compactBar: width < 980
 
@@ -140,6 +141,33 @@ RowLayout {
         shortcut: "Ctrl L"
         onClicked: cam.set("asleep", !cam.values.asleep)
     }
+    IconBtn { // sleep timer
+        id: sleepMenuBtn
+        iconName: "chevron-down"
+        tip: cam.values.sleepTimer > 0 ? qsTr("Sleeps after %1 minutes without use").arg(Math.round(cam.values.sleepTimer / 60))
+                                       : qsTr("Sleep timer: off")
+        implicitWidth: 28
+        implicitHeight: 36
+        Layout.leftMargin: -8
+        enabled: cam.connected
+        onClicked: sleepMenu.popup(sleepMenuBtn, 0, sleepMenuBtn.height + 6)
+    }
+    StyledMenu {
+        id: sleepMenu
+        MenuEntry { text: qsTr("Sleep after the camera isn't used for…"); enabled: false }
+        Instantiator {
+            readonly property var seconds: [0, 300, 600, 1800, 3600]
+            model: [qsTr("Never"), qsTr("5 minutes"), qsTr("10 minutes"), qsTr("30 minutes"), qsTr("1 hour")]
+            delegate: MenuEntry {
+                required property int index
+                required property string modelData
+                text: (cam.values.sleepTimer === [0, 300, 600, 1800, 3600][index] ? "✓  " : "     ") + modelData
+                onTriggered: cam.set("sleepTimer", [0, 300, 600, 1800, 3600][index])
+            }
+            onObjectAdded: (index, object) => sleepMenu.insertItem(index + 1, object)
+            onObjectRemoved: (index, object) => sleepMenu.removeItem(object)
+        }
+    }
     IconBtn {
         id: helpBtn
         iconName: "help"
@@ -151,7 +179,8 @@ RowLayout {
     StyledMenu {
         id: helpMenu
         MenuEntry { text: qsTr("Show the tour"); onTriggered: root.openTour() }
-        MenuEntry { text: qsTr("All commands and shortcuts"); onTriggered: root.openPalette() }
+        MenuEntry { text: qsTr("Keyboard shortcuts"); onTriggered: root.openShortcuts() }
+        MenuEntry { text: qsTr("Search all commands"); onTriggered: root.openPalette() }
         MenuEntry { text: qsTr("Report a problem…"); onTriggered: root.openReport() }
         MenuEntry { text: qsTr("About Gimbot"); onTriggered: root.openAbout() }
     }

@@ -20,6 +20,7 @@ FocusScope {
     signal openTour()
     signal openAbout()
     signal openSection(string section)
+    signal openShortcuts()
 
     readonly property alias preview: preview
     readonly property bool wide: width >= 1080
@@ -73,6 +74,7 @@ FocusScope {
         case Qt.Key_Home: cam.recenter(); e.accepted = true; return
         case Qt.Key_Plus: case Qt.Key_Equal: cam.zoomBy(10); e.accepted = true; return
         case Qt.Key_Minus: cam.zoomBy(-10); e.accepted = true; return
+        case Qt.Key_Question: root.openShortcuts(); e.accepted = true; return
         default: return
         }
         e.accepted = true
@@ -103,6 +105,7 @@ FocusScope {
             onOpenTour: root.openTour()
             onOpenReport: root.openReport()
             onOpenAbout: root.openAbout()
+            onOpenShortcuts: root.openShortcuts()
         }
 
         StatusStrip {

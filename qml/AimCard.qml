@@ -119,6 +119,35 @@ Card {
         onMoved: (v) => cam.set("zoom", Math.round(v))
     }
 
+    // One-click zoom levels, worked out from the camera's own zoom range.
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: 6
+        readonly property real maxZoom: cam.ranges.zoomMax > 1 ? cam.ranges.zoomMax : 4
+        function percentFor(x) { return Math.round(Math.max(0, Math.min(1, (x - 1) / (maxZoom - 1))) * 100) }
+        Repeater {
+            model: {
+                const m = parent.maxZoom
+                let levels = [1]
+                if (m >= 2.5) levels.push(2)
+                if (m >= 4.5) levels.push(Math.round(m / 2))
+                levels.push(m)
+                return levels
+            }
+            Btn {
+                required property real modelData
+                readonly property int percent: parent.percentFor(modelData)
+                Layout.fillWidth: true
+                text: (Math.round(modelData * 10) / 10) + "×"
+                variant: Math.abs(cam.values.zoom - percent) <= 1 ? "primary" : "outline"
+                compact: true
+                enabled: root.usable
+                tip: modelData === 1 ? qsTr("No zoom") : qsTr("Zoom to %1×").arg(Math.round(modelData * 10) / 10)
+                onClicked: cam.set("zoom", percent)
+            }
+        }
+    }
+
     ColumnLayout {
         spacing: 8
         Layout.fillWidth: true

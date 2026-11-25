@@ -20,7 +20,10 @@ int choose(const std::vector<Format> &formats, int targetHeight, int quality)
     case 1: want = 720; break;
     case 2: want = 1080; break;
     case 3: want = 2160; break;
-    default: want = std::max(720, targetHeight); break; // never below 720p
+    // Auto: enough for the window, between 720p and 1080p. 4K at 30 fps
+    // looks no better in a window than 1080p at 60, and costs a lot more CPU
+    // to decode, so it's only used when chosen.
+    default: want = std::clamp(targetHeight, 720, 1080); break;
     }
 
     auto better = [&](int a, int b) { // is format a a better pick than b?

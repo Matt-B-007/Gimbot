@@ -26,6 +26,8 @@ class Updater : public QObject {
     Q_PROPERTY(QString checkError READ checkError NOTIFY changed)
     // The computer's DNS failed and the check went through a public DNS service.
     Q_PROPERTY(bool usedDnsFallback READ usedDnsFallback NOTIFY changed)
+    // Seconds until "Try again" can be pressed after a failed check.
+    Q_PROPERTY(int retryIn READ retryIn NOTIFY retryInChanged)
 
     Q_PROPERTY(bool canInstall READ canInstall CONSTANT)
     Q_PROPERTY(QString installState READ installState NOTIFY installChanged) // idle running done failed
@@ -48,6 +50,7 @@ public:
     QString lastChecked() const { return m_lastChecked; }
     QString checkError() const { return m_checkError; }
     bool usedDnsFallback() const { return m_dnsFallback; }
+    int retryIn() const { return m_retryIn; }
 
     bool canInstall() const { return m_simulated || (!m_helper.isEmpty() && configured()); }
     QString installState() const { return m_installState; }
@@ -79,6 +82,7 @@ public:
 signals:
     // A check failed. manual: the user asked for it, so tell them right away.
     void checkFailed(const QString &message, bool manual);
+    void retryInChanged();
     void changed();
     void installChanged();
 
@@ -103,6 +107,9 @@ private:
     qint64 m_lastAttempt = 0;   // ms since epoch
     int m_failures = 0;         // in a row, for backing off
     QTimer m_retry;
+    QTimer m_cooldown;          // ticks retryIn down once a second
+    int m_retryIn = 0;
+    int m_curlExit = 0;         // last backup lookup's curl exit code
 
     QProcess *m_proc = nullptr;
     QString m_installState = "idle", m_status, m_error, m_log, m_action = "update";

@@ -44,7 +44,7 @@ ApplicationWindow {
 
     // Used by --screenshots to visit each screen.
     function showScreen(name) {
-        palette.close(); report.close(); about.close(); tour.close(); directionCheck.close(); uninstallDialog.close()
+        palette.close(); report.close(); about.close(); shortcutsDialog.close(); tour.close(); directionCheck.close(); uninstallDialog.close()
         if (name !== "updating" && name !== "updated") updateDialog.close()
         if (name.endsWith("-dark")) { cam.set("theme", 1); name = name.replace("-dark", "") }
         forceConnectScreen = name === "connect"
@@ -60,6 +60,7 @@ ApplicationWindow {
         if (name === "tour") { tour.open(); tour.step = 1 }
         if (name === "directions") directionCheck.open()
         if (name === "uninstall") uninstallDialog.open()
+        if (name === "shortcuts") shortcutsDialog.open()
         window.width = 1320; window.height = 880
         if (name === "small") { window.width = 820; window.height = 1400 }
         if (name === "more") { cam.set("moreAim", true); cam.set("moreTracking", true); cam.set("moreImage", true); window.height = 2100 }
@@ -125,6 +126,7 @@ ApplicationWindow {
         onSaveProfile: { nameDialog.mode = "profile"; nameDialog.value = ""; nameDialog.open() }
         onOpenTour: window.startTour()
         onOpenAbout: about.open()
+        onOpenShortcuts: shortcutsDialog.open()
         onOpenSection: (section) => window.openSettings(section)
         onSavePreset: { nameDialog.mode = "preset"; nameDialog.value = qsTr("Preset %1").arg(cam.presets.length + 1); nameDialog.open() }
         onRenamePreset: (id, name) => { nameDialog.mode = "rename"; nameDialog.targetId = id; nameDialog.value = name; nameDialog.open() }
@@ -200,6 +202,7 @@ ApplicationWindow {
                 { title: qsTr("Check for updates"), icon: "download", run: () => { updater.check(); window.openSettings("app") } },
                 { title: updater.state === "available" && updater.canInstall ? qsTr("Install Gimbot %1").arg(updater.latestVersion) : "", icon: "download", run: () => updateDialog.open() },
                 { title: qsTr("Report a problem"), icon: "bug", keywords: "bug issue help", run: () => report.open() },
+                { title: qsTr("Keyboard shortcuts"), hint: "?", icon: "help", keywords: "keys hotkeys", run: () => shortcutsDialog.open() },
                 { title: qsTr("Show the tour"), icon: "help", keywords: "help tips intro", run: () => window.startTour() },
                 { title: qsTr("Check movement directions"), icon: "move", keywords: "invert reversed up down", run: () => directionCheck.open() },
                 { title: qsTr("Movement: %1").arg([qsTr("Fast"), qsTr("Normal"), qsTr("Smooth"), qsTr("Cinematic")][(cam.values.smoothness + 1) % 4]), icon: "move", keywords: "smoothness speed glide", run: () => cam.set("smoothness", (cam.values.smoothness + 1) % 4) },
@@ -224,6 +227,7 @@ ApplicationWindow {
     AboutDialog { id: about }
     ConfirmDialog { id: confirm }
     DirectionCheck { id: directionCheck }
+    ShortcutsDialog { id: shortcutsDialog }
     UninstallDialog { id: uninstallDialog }
     Tour {
         id: tour
@@ -258,5 +262,11 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+1"; onActivated: cam.goToPresetIndex(0) }
     Shortcut { sequence: "Ctrl+2"; onActivated: cam.goToPresetIndex(1) }
     Shortcut { sequence: "Ctrl+3"; onActivated: cam.goToPresetIndex(2) }
+    Shortcut { sequence: "Ctrl+4"; onActivated: cam.goToPresetIndex(3) }
+    Shortcut { sequence: "Ctrl+5"; onActivated: cam.goToPresetIndex(4) }
+    Shortcut { sequence: "Ctrl+6"; onActivated: cam.goToPresetIndex(5) }
+    Shortcut { sequence: "Ctrl+7"; onActivated: cam.goToPresetIndex(6) }
+    Shortcut { sequence: "Ctrl+8"; onActivated: cam.goToPresetIndex(7) }
+    Shortcut { sequence: "Ctrl+9"; onActivated: cam.goToPresetIndex(8) }
     Shortcut { sequence: "Esc"; enabled: window.page === "settings"; onActivated: window.page = "studio" }
 }

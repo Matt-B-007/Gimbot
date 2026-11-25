@@ -111,6 +111,31 @@ private slots:
         QVERIFY(cam->profiles().contains("Meetings"));
     }
 
+    void reorderPresets()
+    {
+        QTRY_VERIFY_WITH_TIMEOUT(cam->presets().size() >= 2, 3000);
+        const int first = cam->presets()[0].toMap()["id"].toInt();
+        const int second = cam->presets()[1].toMap()["id"].toInt();
+        cam->movePreset(first, 1);
+        QCOMPARE(cam->presets()[0].toMap()["id"].toInt(), second);
+        QCOMPARE(cam->presets()[1].toMap()["id"].toInt(), first);
+        QCOMPARE(cam->presets()[1].toMap()["index"].toInt(), 1); // Ctrl+2 follows the new order
+        cam->movePreset(first, -5);                                // clamped to the start
+        QCOMPARE(cam->presets()[0].toMap()["id"].toInt(), first);
+    }
+
+    void startupPreset()
+    {
+        QTRY_VERIFY_WITH_TIMEOUT(cam->presets().size() >= 1, 3000);
+        const int id = cam->presets()[0].toMap()["id"].toInt();
+        cam->set("mode", 2);
+        cam->setStartupPreset(id);
+        QCOMPARE(cam->values().value("startupPreset").toInt(), id);
+        QCOMPARE(mode(), 0); // moving to the preset pauses tracking
+        cam->setStartupPreset(-1);
+        QCOMPARE(cam->values().value("startupPreset").toInt(), -1);
+    }
+
     void activeProfile()
     {
         cam->set("fov", 2);

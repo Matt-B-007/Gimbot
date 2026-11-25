@@ -10,6 +10,10 @@ Card {
     moreKey: "moreImage"
     readonly property var v: cam.values
     readonly property bool usable: cam.connected && !v.asleep
+    readonly property bool narrow: width < 380 // white balance becomes a drop-down
+    readonly property var wbNames: [qsTr("Auto"), qsTr("Daylight"), qsTr("Cloudy"), qsTr("Indoor"), qsTr("Fluorescent"), qsTr("Manual")]
+    readonly property var wbTips: [qsTr("The camera picks the color for you"), qsTr("Sunlight"), qsTr("Overcast daylight"),
+                                   qsTr("Warm indoor bulbs (tungsten)"), qsTr("Office tube lights"), qsTr("Set the temperature yourself")]
     note: v.asleep ? qsTr("The camera is asleep. Wake it to adjust the picture.") : ""
     noteAction: v.asleep ? qsTr("Wake") : ""
     onNoteActivated: cam.set("asleep", false)
@@ -93,22 +97,31 @@ Card {
         spacing: 8
         Layout.fillWidth: true
         Caption { text: qsTr("White balance") }
-        Flow { // chips
+        Flow { // chips when there's room
+            visible: !root.narrow
             Layout.fillWidth: true
             spacing: 6
             Repeater {
-                model: [qsTr("Auto"), qsTr("Daylight"), qsTr("Cloudy"), qsTr("Indoor"), qsTr("Fluorescent"), qsTr("Manual")]
+                model: root.wbNames
                 Chip {
                     required property int index
                     required property string modelData
                     text: modelData
                     selected: root.v.wbMode === index
                     enabled: root.usable
-                    tip: [qsTr("The camera picks the color for you"), qsTr("Sunlight"), qsTr("Overcast daylight"),
-                          qsTr("Warm indoor bulbs (tungsten)"), qsTr("Office tube lights"), qsTr("Set the temperature yourself")][index]
+                    tip: root.wbTips[index]
                     onClicked: cam.set("wbMode", index)
                 }
             }
+        }
+        Select { // a drop-down in a narrow window
+            visible: root.narrow
+            Layout.fillWidth: true
+            model: root.wbNames
+            currentIndex: root.v.wbMode
+            enabled: root.usable
+            accessibleName: qsTr("White balance")
+            onActivated: (i) => cam.set("wbMode", i)
         }
         SliderRow {
             Layout.fillWidth: true
@@ -211,6 +224,36 @@ Card {
             value: root.v.saturation
             enabled: root.usable
             onMoved: (x) => cam.set("saturation", Math.round(x))
+        },
+        SliderRow {
+            Layout.fillWidth: true
+            label: qsTr("Hue")
+            tip: qsTr("Shifts all colors around the color wheel. Usually best left in the middle.")
+            from: cam.ranges.hue.min; to: cam.ranges.hue.max; stepSize: 1
+            value: root.v.hue
+            enabled: root.usable
+            onMoved: (x) => cam.set("hue", Math.round(x))
+        },
+        RowLayout {
+            Layout.fillWidth: true
+            ColumnLayout {
+                spacing: 1
+                Layout.fillWidth: true
+                Text { text: qsTr("Anti-flicker"); color: Theme.text; font.family: Theme.font; font.pixelSize: Theme.fontSize }
+                Text {
+                    text: qsTr("Fixes stripes or flicker under room lights. North America: 60 Hz, most other places: 50 Hz.")
+                    color: Theme.textMuted; font.family: Theme.font; font.pixelSize: Theme.small
+                    wrapMode: Text.WordWrap; Layout.fillWidth: true
+                }
+            }
+            Select {
+                implicitWidth: 110
+                model: [qsTr("Off"), qsTr("50 Hz"), qsTr("60 Hz"), qsTr("Auto")]
+                currentIndex: root.v.antiFlicker
+                enabled: root.usable
+                accessibleName: qsTr("Anti-flicker")
+                onActivated: (i) => cam.set("antiFlicker", i)
+            }
         },
         SliderRow {
             Layout.fillWidth: true

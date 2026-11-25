@@ -244,6 +244,7 @@ public:
         auto ratio = static_cast<uint32_t>(zoomMin_ + (zoomMax_ - zoomMin_) * percent / 100);
         return ok(dev_->cameraSetZoomWithSpeedAbsoluteR(ratio, static_cast<uint32_t>(std::clamp(speed, 0, 10))));
     }
+    float maxZoom() const override { return zoomMax_ > zoomMin_ ? float(zoomMax_) / 100.0f : 4.0f; }
     bool setZoomSpeed(int speed) override
     {
         zoomSpeed_ = std::clamp(speed, 0, 10);

@@ -81,7 +81,11 @@ int main(int argc, char *argv[])
         about.setHomepage(QStringLiteral("https://github.com/" GIMBOT_REPO));
         about.setBugAddress(QByteArray("https://github.com/" GIMBOT_REPO "/issues"));
     }
+    // Without this KAboutData invents "org.kde.gimbot", which matches no
+    // .desktop file, so the desktop portal can't identify the app.
+    about.setDesktopFileName(QStringLiteral("io.github.Matt_B_007.Gimbot"));
     KAboutData::setApplicationData(about);
+    QApplication::setDesktopFileName(QStringLiteral("io.github.Matt_B_007.Gimbot"));
     KCrash::initialize();
 #endif
 
@@ -180,7 +184,7 @@ int main(int argc, char *argv[])
         engine.rootObjects().first()->setProperty("screenshotMode", true);
         const QStringList steps = {"studio",  "more", "settings", "settings:image", "settings:motion", "settings:app",
                                    "settings:device", "palette", "report", "about", "connect", "tour",
-                                   "directions", "uninstall", "studio-dark", "settings:voice-dark",
+                                   "directions", "uninstall", "shortcuts", "studio-dark", "settings:voice-dark",
                                    "settings:area-dark", "report-dark", "connect-dark", "update", "updating",
                                    "updated", "update-error", "small", "small-dark"};
         auto index = std::make_shared<int>(0);

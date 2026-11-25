@@ -713,7 +713,16 @@ Rectangle {
                                 compact: true
                                 onClicked: updater.canInstall ? root.openUpdate() : platform.openUrl(updater.latestUrl)
                             }
-                            Btn { text: updater.state === "error" ? qsTr("Try again") : qsTr("Check now"); iconName: "refresh"; compact: true; enabled: updater.state !== "checking"; onClicked: updater.check() }
+                            Btn {
+                                text: updater.state === "checking" ? qsTr("Checking…")
+                                    : updater.state === "error" ? (updater.retryIn > 0 ? qsTr("Try again in %1 s").arg(updater.retryIn) : qsTr("Try again"))
+                                    : qsTr("Check now")
+                                iconName: "refresh"
+                                compact: true
+                                enabled: updater.state !== "checking" && !(updater.state === "error" && updater.retryIn > 0)
+                                tip: updater.retryIn > 0 ? qsTr("Waiting a moment before asking GitHub again") : ""
+                                onClicked: updater.check()
+                            }
                         }
 
                         Label2 { text: qsTr("Help"); Layout.topMargin: 8 }

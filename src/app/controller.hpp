@@ -101,6 +101,10 @@ public:
     Q_INVOKABLE void goToPreset(int id);
     Q_INVOKABLE void goToPresetIndex(int index);
     Q_INVOKABLE void renamePreset(int id, const QString &name);
+    // Move a preset to a new place on the strip (display order only).
+    Q_INVOKABLE void movePreset(int id, int toIndex);
+    // Where the camera points when it turns on: -1 straight ahead, or a preset.
+    Q_INVOKABLE void setStartupPreset(int id);
     Q_INVOKABLE void deletePreset(int id);
     Q_INVOKABLE QString thumbnailPath(int id) const;
     Q_INVOKABLE void thumbnailSaved(int id);

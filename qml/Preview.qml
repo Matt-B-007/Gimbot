@@ -30,6 +30,8 @@ Rectangle {
         function onValuesChanged() { if (cam.values.previewQuality !== root.appliedQuality) formatTimer.restart() }
     }
     property int appliedQuality: -1
+    property var appliedDevice: null
+    property int appliedFor: -1
     function chooseFormat() {
         if (root.device === null) return
         appliedQuality = cam.values.previewQuality
@@ -38,6 +40,12 @@ Rectangle {
         const cur = qcam.cameraFormat
         if (cur.resolution.width === f.resolution.width && cur.resolution.height === f.resolution.height
                 && cur.maxFrameRate === f.maxFrameRate && cur.pixelFormat === f.pixelFormat) return
+        // Changing format restarts the video, so in Auto only step up when the
+        // window grows; a sharper picture in a smaller window is fine.
+        const sameChoice = appliedDevice === root.device && appliedFor === cam.values.previewQuality
+        if (cam.values.previewQuality === 0 && sameChoice && cur.resolution.height >= f.resolution.height) return
+        appliedDevice = root.device
+        appliedFor = cam.values.previewQuality
         qcam.cameraFormat = f
     }
     Timer { id: formatTimer; interval: 500; onTriggered: root.chooseFormat() }
@@ -195,10 +203,15 @@ Rectangle {
 
     // Drag-to-steer: a line from where you pressed to the pointer.
     Canvas {
+        id: steerLine
         anchors.fill: parent
         visible: pointer.steering
         onVisibleChanged: requestPaint()
-        Connections { target: pointer; function onMouseXChanged() { if (pointer.steering) parent.requestPaint() } function onMouseYChanged() { if (pointer.steering) parent.requestPaint() } }
+        Connections {
+            target: pointer
+            function onMouseXChanged() { if (pointer.steering) steerLine.requestPaint() }
+            function onMouseYChanged() { if (pointer.steering) steerLine.requestPaint() }
+        }
         onPaint: {
             const ctx = getContext("2d")
             ctx.reset()

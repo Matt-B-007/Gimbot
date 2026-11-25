@@ -246,6 +246,7 @@ void Controller::defineSettings()
     def("autoResumeSeconds", Kind::App, 5, {});
     def("previewQuality", Kind::App, 0, {});    // 0 auto (sharpest), 1 720p, 2 1080p, 3 4K
     def("tourDone", Kind::App, false, {});
+    def("startupPreset", Kind::App, -2, {});   // -2 not chosen here, -1 straight ahead, else preset id
     def("moreAim", Kind::App, false, {});      // "More" sections on the main screen
     def("moreTracking", Kind::App, false, {});
     def("moreImage", Kind::App, false, {});
@@ -392,6 +393,7 @@ QVariantMap Controller::gatherAll(Camera &cam) const
         ranges[p.first] = rangeMap(cam.imageRange(p.second), 0, 100, 50);
     }
     ranges["wb"] = rangeMap(cam.whiteBalanceRange(), 2000, 10000, 5000);
+    ranges["zoomMax"] = double(cam.maxZoom());
     v["_ranges"] = ranges;
     int wbMode = 0, kelvin = 5000;
     if (cam.whiteBalance(wbMode, kelvin)) {
@@ -676,10 +678,20 @@ void Controller::thumbnailSaved(int id)
 
 void Controller::buildPresetList(const std::vector<t2::Preset> &list)
 {
-    m_rawPresets = list;
+    // Show presets in the order the user arranged (kept per camera); new
+    // ones go at the end.
+    const QVariantList order = m_settings.value("presetOrder/" + (m_serial.isEmpty() ? QStringLiteral("camera") : m_serial)).toList();
+    auto rank = [&](int id) {
+        const int i = order.indexOf(id);
+        return i < 0 ? 1000 + id : i;
+    };
+    std::vector<t2::Preset> sorted = list;
+    std::stable_sort(sorted.begin(), sorted.end(), [&](const t2::Preset &a, const t2::Preset &b) { return rank(a.id) < rank(b.id); });
+    m_rawPresets = sorted;
+    const auto &listInOrder = m_rawPresets;
     m_presets.clear();
     int index = 0;
-    for (const auto &p : list) {
+    for (const auto &p : listInOrder) {
         const QString name = QString::fromStdString(p.name);
         const QString path = thumbnailPath(p.id);
         m_presets.append(QVariantMap{
@@ -747,6 +759,39 @@ void Controller::goToPreset(int id)
 void Controller::goToPresetIndex(int index)
 {
     if (index >= 0 && index < int(m_rawPresets.size())) goToPreset(m_rawPresets[index].id);
+}
+
+void Controller::movePreset(int id, int toIndex)
+{
+    QVariantList ids;
+    for (const auto &p : m_rawPresets) ids << p.id;
+    const int from = ids.indexOf(id);
+    toIndex = std::clamp(toIndex, 0, int(ids.size()) - 1);
+    if (from < 0 || from == toIndex) return;
+    ids.move(from, toIndex);
+    m_settings.setValue("presetOrder/" + (m_serial.isEmpty() ? QStringLiteral("camera") : m_serial), ids);
+    buildPresetList(m_rawPresets);
+}
+
+void Controller::setStartupPreset(int id)
+{
+    // -1: straight ahead. Otherwise go to the preset, then save where the
+    // camera is as its start position (the camera keeps one position).
+    m_values["startupPreset"] = id;
+    m_settings.setValue("settings/startupPreset", id);
+    emit valuesChanged();
+    if (id < 0) {
+        startup("reset");
+        emit notice(tr("The camera will start pointing straight ahead"));
+        return;
+    }
+    leaveTracking();
+    call("move", tr("the preset"), [id](Camera &c) { return c.goToPreset(id); });
+    QTimer::singleShot(3000, this, [this] {
+        call("startup", tr("the start position"), [](Camera &c) { return c.bootUseCurrent(); }, false);
+    });
+    for (const auto &p : m_rawPresets)
+        if (p.id == id) emit notice(tr("The camera will start at “%1”").arg(QString::fromStdString(p.name)));
 }
 
 void Controller::renamePreset(int id, const QString &name)

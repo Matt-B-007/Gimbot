@@ -11,7 +11,8 @@ Remo Tech.**
 - **Smooth movement**: Fast, Normal, Smooth or Cinematic glides for click-to-aim, the dial, presets (angle and zoom together) and eased arrow keys
 - **Aim dial**: shows where the camera points, live; click or drag to aim. Up is up and right is right everywhere, with a two-step direction check if your camera disagrees
 - **Main screen** has what you change during a call: white balance chips, focus and exposure (auto/manual), gestures, voice commands, tracking area, a profile switcher and a status line that says what the camera is doing and how to fix problems
-- **Presets** with thumbnails, Ctrl+1–3, rename/update/delete
+- **Presets** with thumbnails, Ctrl+1–9, rename/update/delete, drag to reorder, and pick which one the camera starts at
+- **Quick controls**: zoom buttons (1×, 2×, max), a sleep timer next to the Sleep button, anti-flicker and hue under Image, and every shortcut on one page (press `?`)
 - **Every Tiny 2 setting in the SDK**: tracking area, startup position and mode, sleep timer, microphone during sleep, automatic mic volume, voice commands and language, field of view, exposure/shutter, focus, white balance presets and temperature, brightness/contrast/saturation/sharpness/hue, anti-flicker, HDR, mirror, zoom speed, gestures, reverse pan, guide light, factory reset
 - **Profiles**: save whole setups ("Meetings", "Streaming"), switch in one click, import/export
 - **Automatic camera detection**: plug in and it connects; unplug and it waits

@@ -193,6 +193,8 @@ public:
     virtual bool setZoom(int percent) = 0;   // 0..100 of the camera's range
     virtual bool setZoomSpeed(int speed) = 0; // 0 = camera default, 1..10
     virtual bool setZoomAtSpeed(int percent, int speed) = 0; // one-off speed
+    // Magnification at 100% zoom (the Tiny 2 reports its range, usually 4x).
+    virtual float maxZoom() const { return 4.0f; }
 
     // Image
     virtual bool setFov(Fov fov) = 0;
