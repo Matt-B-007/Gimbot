@@ -1,0 +1,91 @@
+# Publishes Gimbot automatically whenever files arrive on main.
+#
+# 1. If a Gimbot zip was uploaded to the top of the repository, unpack it over
+#    the files (except .github/workflows, which this job isn't allowed to
+#    change), delete the zip and commit.
+# 2. If the version in CMakeLists.txt has no release yet, create one: a
+#    pre-release for betas, with that version's notes from CHANGELOG.md and
+#    the source zip attached.
+name: Publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: publish
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Unpack an uploaded zip
+        run: |
+          shopt -s nullglob
+          zips=( Gimbot*.zip gimbot*.zip )
+          if (( ${#zips[@]} == 0 )); then echo "No zip uploaded."; exit 0; fi
+          zip="$(printf '%s\n' "${zips[@]}" | sort -V | tail -n1)"
+          echo "Unpacking $zip"
+          tmp="$(mktemp -d)"
+          unzip -q "$zip" -d "$tmp"
+          # The zip normally holds one folder (Gimbot/); use what's inside it.
+          src="$tmp"
+          entries=( "$tmp"/* )
+          if (( ${#entries[@]} == 1 )) && [[ -d "${entries[0]}" ]]; then src="${entries[0]}"; fi
+          if [[ ! -f "$src/CMakeLists.txt" || ! -f "$src/install.sh" ]]; then
+            echo "::error::$zip doesn't look like Gimbot (no CMakeLists.txt and install.sh inside)"
+            exit 1
+          fi
+          git rm -q "${zips[@]}"
+          # Replace every file with the zip's (files the zip no longer has
+          # are removed), leaving .github/workflows alone.
+          git ls-files -z | grep -zv '^\.github/workflows/' | xargs -0 -r git rm -q --
+          tar -C "$src" --exclude=./.github/workflows -cf - . | tar -xf -
+          chmod +x install.sh
+          if [[ -d "$src/.github/workflows" ]] && ! diff -rq "$src/.github/workflows" .github/workflows >/dev/null; then
+            echo "::warning::The zip has changed files in .github/workflows. GitHub doesn't let this job update them; upload them through the website."
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+          else
+            git commit -qm "Unpack $zip"
+            git push origin "HEAD:${GITHUB_REF_NAME:-main}"
+          fi
+
+      - name: Release this version if it's new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(sed -nE 's/^set\(GIMBOT_VERSION "([^"]+)".*/\1/p' CMakeLists.txt | head -n1)"
+          if [[ -z "$version" ]]; then echo "::error::No GIMBOT_VERSION in CMakeLists.txt"; exit 1; fi
+          tag="v$version"
+          if gh release view "$tag" >/dev/null 2>&1; then echo "$tag is already released."; exit 0; fi
+          # Notes: this version's section of CHANGELOG.md.
+          awk -v v="$version" '
+            /^## / { if (found) exit; split(substr($0, 4), w, " "); x = w[1]; sub(/^v/, "", x); found = (x == v); next }
+            found' CHANGELOG.md > notes.md 2>/dev/null || true
+          [[ -s notes.md ]] || echo "Gimbot $version" > notes.md
+          {
+            echo
+            echo "**Install or update:**"
+            echo
+            echo '```sh'
+            echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/install.sh | bash"
+            echo '```'
+          } >> notes.md
+          pre=""
+          [[ "$version" == *-* ]] && pre="--prerelease"
+          git archive --format=zip --prefix="Gimbot/" -o "Gimbot-$version-source.zip" HEAD
+          gh release create "$tag" --target "$(git rev-parse HEAD)" --title "Gimbot $version" \
+            --notes-file notes.md $pre "Gimbot-$version-source.zip"
+          echo "Released $tag."

@@ -98,40 +98,62 @@ void Updater::startCheck(bool manual)
     m_lastAttempt = now;
     m_manual = manual;
     m_retry.stop();
+    m_dnsFallback = false;
     setState("checking");
-    QNetworkRequest req(QUrl(QStringLiteral("https://api.github.com/repos/%1/releases?per_page=30").arg(m_repo)));
-    req.setRawHeader("Accept", "application/vnd.github+json");
+
+    // 1. Published releases. 2. The version in the files last uploaded to the
+    // main branch, so an upload alone is enough for people to get it.
+    fetch(QStringLiteral("https://api.github.com/repos/%1/releases?per_page=30").arg(m_repo), true,
+          [this](bool ok, const QByteArray &releases, const QString &error) {
+              if (!ok) {
+                  fail(error);
+                  return;
+              }
+              fetch(QStringLiteral("https://raw.githubusercontent.com/%1/main/CMakeLists.txt").arg(m_repo), false,
+                    [this, releases](bool ok2, const QByteArray &cmake, const QString &) {
+                        // The uploaded version is a bonus; releases alone still work.
+                        decide(releases, ok2 ? cmake : QByteArray());
+                    });
+          });
+}
+
+void Updater::fetch(const QString &url, bool json, std::function<void(bool, const QByteArray &, const QString &)> done)
+{
+    QNetworkRequest req{QUrl(url)};
+    if (json) req.setRawHeader("Accept", "application/vnd.github+json");
     req.setHeader(QNetworkRequest::UserAgentHeader, QByteArray("Gimbot/") + m_current.toUtf8());
     req.setTransferTimeout(15000);
     auto *reply = m_net.get(req);
-    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, url, json, done] {
         reply->deleteLater();
         const int http = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const auto err = reply->error();
         if (err == QNetworkReply::NoError) {
-            m_dnsFallback = false;
-            handleReleases(reply->readAll());
+            done(true, reply->readAll(), QString());
             return;
         }
-        qWarning() << "Update check failed:" << reply->errorString();
+        qWarning().noquote() << "Couldn't fetch" << url << ":" << reply->errorString();
         if (err == QNetworkReply::HostNotFoundError) {
-            checkWithCurl(0); // the computer can't look up names: try public DNS
+            fetchWithCurl(url, json, 0, done); // the computer can't look up names: try public DNS
             return;
         }
+        QString why;
         if (http == 403 || http == 429)
-            fail(tr("GitHub is limiting update checks right now. Gimbot will try again later."));
+            why = tr("GitHub is limiting update checks right now. Gimbot will try again later.");
         else if (http == 404)
-            fail(tr("Gimbot's releases page on GitHub wasn't found."));
+            why = tr("Gimbot's page on GitHub wasn't found.");
         else if (err == QNetworkReply::TimeoutError || err == QNetworkReply::OperationCanceledError)
-            fail(tr("GitHub took too long to answer. Check your internet connection."));
+            why = tr("GitHub took too long to answer. Check your internet connection.");
         else if (err == QNetworkReply::SslHandshakeFailedError)
-            fail(tr("Couldn't make a secure connection to GitHub. Check the computer's date and time."));
+            why = tr("Couldn't make a secure connection to GitHub. Check the computer's date and time.");
         else
-            fail(tr("Can't reach GitHub. Check your internet connection."));
+            why = tr("Can't reach GitHub. Check your internet connection.");
+        done(false, {}, why);
     });
 }
 
-void Updater::checkWithCurl(int dohIndex)
+void Updater::fetchWithCurl(const QString &url, bool json, int dohIndex,
+                            std::function<void(bool, const QByteArray &, const QString &)> done)
 {
     static const QStringList doh = {QStringLiteral("https://1.1.1.1/dns-query"), QStringLiteral("https://8.8.8.8/dns-query")};
     const QString curl = QStandardPaths::findExecutable("curl");
@@ -140,19 +162,19 @@ void Updater::checkWithCurl(int dohIndex)
         // 7 = couldn't connect, 28 = timed out: the backup couldn't get out
         // either, so it's the connection, not just DNS.
         if (m_curlExit == 7 || m_curlExit == 28)
-            fail(tr("This computer isn't connected to the internet right now, so Gimbot can't reach GitHub."));
+            done(false, {}, tr("This computer isn't connected to the internet right now, so Gimbot can't reach GitHub."));
         else
-            fail(tr("This computer can't look up web addresses (DNS isn't working), so Gimbot can't reach GitHub. "
-                    "Other apps are probably affected too."));
+            done(false, {}, tr("This computer can't look up web addresses (DNS isn't working), so Gimbot can't reach GitHub. "
+                               "Other apps are probably affected too."));
         return;
     }
     auto *proc = new QProcess(this);
-    connect(proc, &QProcess::finished, this, [this, proc, dohIndex](int code, QProcess::ExitStatus status) {
+    connect(proc, &QProcess::finished, this, [this, proc, url, json, dohIndex, done](int code, QProcess::ExitStatus status) {
         proc->deleteLater();
         if (status == QProcess::NormalExit && code == 0) {
-            qInfo() << "Checked for updates through" << doh[dohIndex] << "because the computer's DNS failed";
+            qInfo() << "Fetched" << url << "through" << doh[dohIndex] << "because the computer's DNS failed";
             m_dnsFallback = true;
-            handleReleases(proc->readAllStandardOutput());
+            done(true, proc->readAllStandardOutput(), QString());
             return;
         }
         // Say why, so a bug report shows the cause (curl exit codes: 6 name
@@ -161,19 +183,19 @@ void Updater::checkWithCurl(int dohIndex)
         m_curlExit = status == QProcess::NormalExit ? code : -1;
         qWarning().noquote() << QStringLiteral("Backup lookup through %1 failed: curl exit %2%3")
                                     .arg(doh[dohIndex])
-                                    .arg(status == QProcess::NormalExit ? code : -1)
+                                    .arg(m_curlExit)
                                     .arg(why.isEmpty() ? QString() : ": " + why);
-        checkWithCurl(dohIndex + 1);
+        fetchWithCurl(url, json, dohIndex + 1, done);
     });
-    connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError e) {
+    connect(proc, &QProcess::errorOccurred, this, [this, proc, url, json, done](QProcess::ProcessError e) {
         if (e != QProcess::FailedToStart) return; // finished() handles the rest
         qWarning() << "Couldn't run curl for the backup lookup";
         proc->deleteLater();
-        checkWithCurl(int(doh.size())); // no backup possible: report the DNS problem
+        fetchWithCurl(url, json, int(doh.size()), done);
     });
-    proc->start(curl, {"-fsSL", "-S", "--max-time", "20", "--doh-url", doh[dohIndex], "-H", "Accept: application/vnd.github+json",
-                       "-A", "Gimbot/" + m_current,
-                       QStringLiteral("https://api.github.com/repos/%1/releases?per_page=30").arg(m_repo)});
+    QStringList args = {"-fsSL", "-S", "--max-time", "20", "--doh-url", doh[dohIndex], "-A", "Gimbot/" + m_current};
+    if (json) args << "-H" << "Accept: application/vnd.github+json";
+    proc->start(curl, args << url);
 }
 
 void Updater::simulateCheckError()
@@ -203,43 +225,112 @@ void Updater::fail(const QString &message)
     emit checkFailed(message, m_manual);
 }
 
-void Updater::handleReleases(const QByteArray &json)
+QString Updater::changelogSection(const QByteArray &changelog, const QString &version)
 {
-    m_lastChecked = QLocale().toString(QDateTime::currentDateTime(), QLocale::ShortFormat);
-    const auto doc = QJsonDocument::fromJson(json);
-    if (!doc.isArray()) {
-        fail(tr("GitHub sent an answer Gimbot didn't understand. It will try again later."));
-        return;
+    // "## 0.1.0-beta.7 ..." up to the next "## " heading.
+    const QStringList lines = QString::fromUtf8(changelog).split('\n');
+    QStringList out;
+    bool in = false;
+    for (const QString &line : lines) {
+        if (line.startsWith("## ")) {
+            if (in) break;
+            // First word of the heading, so 0.1.0-beta.1 doesn't match beta.10.
+            QString first = line.mid(3).trimmed().section(' ', 0, 0);
+            if (first.startsWith('v')) first = first.mid(1);
+            in = first == version;
+            continue;
+        }
+        if (in) out << line;
     }
-    m_failures = 0;
-    m_checkError.clear();
+    return out.join('\n').trimmed();
+}
+
+QString Updater::versionInCmake(const QByteArray &cmake)
+{
+    static const QRegularExpression re(QStringLiteral("^set\\(GIMBOT_VERSION \"([^\"]+)\"\\)"),
+                                       QRegularExpression::MultilineOption);
+    const auto m = re.match(QString::fromUtf8(cmake));
+    return m.hasMatch() ? m.captured(1) : QString();
+}
+
+Updater::Choice Updater::choose(const QByteArray &releasesJson, const QByteArray &mainCmake, const QString &current,
+                                int channel)
+{
+    Choice c;
+    const auto doc = QJsonDocument::fromJson(releasesJson);
+    if (!doc.isArray()) return c;
+    c.valid = true;
     QString best;
     QJsonObject bestObj;
     for (const auto &v : doc.array()) {
         const auto o = v.toObject();
         if (o.value("draft").toBool()) continue;
-        if (o.value("prerelease").toBool() && m_channel < 2) continue;
+        if (o.value("prerelease").toBool() && channel < 2) continue;
         const QString tag = o.value("tag_name").toString();
         if (best.isEmpty() || compareVersions(tag, best) > 0) {
             best = tag;
             bestObj = o;
         }
     }
+    // The files last uploaded to main win if they're newer than any release
+    // (a beta version only counts for people following betas).
+    const QString uploaded = versionInCmake(mainCmake);
+    const bool uploadedBeta = uploaded.contains('-');
+    c.uploaded = !uploaded.isEmpty() && (channel == 2 || !uploadedBeta)
+                 && (best.isEmpty() || compareVersions("v" + uploaded, best) > 0);
+    QString version = best.startsWith('v') ? best.mid(1) : best;
+    if (c.uploaded) version = uploaded;
     // On a beta but following normal releases again: offer the newest
     // normal release even though its number is lower.
-    const bool onBeta = m_current.contains('-');
-    m_switch = !best.isEmpty() && m_channel == 1 && onBeta && compareVersions(best, m_current) < 0;
-    if (best.isEmpty() || (compareVersions(best, m_current) <= 0 && !m_switch)) {
+    const bool onBeta = current.contains('-');
+    c.isSwitch = !version.isEmpty() && channel == 1 && onBeta && compareVersions(version, current) < 0;
+    if (version.isEmpty() || (compareVersions(version, current) <= 0 && !c.isSwitch)) return c;
+    c.version = version;
+    if (c.uploaded) {
+        c.tag = QStringLiteral("main");
+        c.beta = uploadedBeta;
+    } else {
+        c.tag = best;
+        c.release = bestObj;
+        c.beta = bestObj.value("prerelease").toBool();
+    }
+    return c;
+}
+
+void Updater::decide(const QByteArray &releasesJson, const QByteArray &mainCmake)
+{
+    m_lastChecked = QLocale().toString(QDateTime::currentDateTime(), QLocale::ShortFormat);
+    const Choice c = choose(releasesJson, mainCmake, m_current, m_channel);
+    if (!c.valid) {
+        fail(tr("GitHub sent an answer Gimbot didn't understand. It will try again later."));
+        return;
+    }
+    m_failures = 0;
+    m_checkError.clear();
+    m_switch = c.isSwitch;
+    if (c.version.isEmpty()) {
         setState("upToDate");
         return;
     }
-    m_tag = best;
-    m_latest = best.startsWith('v') ? best.mid(1) : best;
-    m_url = bestObj.value("html_url").toString();
-    m_notes = bestObj.value("body").toString().left(6000);
-    m_beta = bestObj.value("prerelease").toBool();
-    qInfo() << "Update available:" << m_latest << (m_beta ? "(beta)" : "") << (m_switch ? "(switch)" : "");
-    setState("available");
+    m_latest = c.version;
+    m_tag = c.tag;
+    m_beta = c.beta;
+    if (!c.uploaded) {
+        m_url = c.release.value("html_url").toString();
+        m_notes = c.release.value("body").toString().left(6000);
+        qInfo() << "Update available:" << m_latest << (m_beta ? "(beta)" : "") << (m_switch ? "(switch)" : "");
+        setState("available");
+        return;
+    }
+    // Uploaded but not released: the installer builds it from the main branch.
+    m_url = QStringLiteral("https://github.com/%1").arg(m_repo);
+    m_notes.clear();
+    qInfo() << "Update available from the uploaded files:" << m_latest << (m_beta ? "(beta)" : "");
+    fetch(QStringLiteral("https://raw.githubusercontent.com/%1/main/CHANGELOG.md").arg(m_repo), false,
+          [this](bool ok, const QByteArray &changelog, const QString &) {
+              if (ok) m_notes = changelogSection(changelog, m_latest).left(6000);
+              setState("available");
+          });
 }
 
 // ---------------------------------------------------------------- installing

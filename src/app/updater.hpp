@@ -8,9 +8,12 @@
 #pragma once
 
 #include <QNetworkAccessManager>
+#include <QJsonObject>
 #include <QObject>
 #include <QProcess>
 #include <QTimer>
+
+#include <functional>
 
 class Updater : public QObject {
     Q_OBJECT
@@ -78,6 +81,19 @@ public:
 
     // -1, 0, 1 like strcmp; understands "1.2.0-beta.3".
     static int compareVersions(const QString &a, const QString &b);
+    // The version in a CMakeLists.txt, and one version's notes from CHANGELOG.md.
+    static QString versionInCmake(const QByteArray &cmake);
+    static QString changelogSection(const QByteArray &changelog, const QString &version);
+
+    // Which version to offer, from the releases list and the uploaded files.
+    struct Choice {
+        bool valid = false;     // the releases answer made sense
+        QString version;        // empty: nothing to offer
+        QString tag;            // release tag, or "main" for uploaded files
+        QJsonObject release;    // the chosen release, if any
+        bool beta = false, isSwitch = false, uploaded = false;
+    };
+    static Choice choose(const QByteArray &releasesJson, const QByteArray &mainCmake, const QString &current, int channel);
 
 signals:
     // A check failed. manual: the user asked for it, so tell them right away.
@@ -91,8 +107,12 @@ private:
     void readOutput();
     void run(const QString &action, const QStringList &args);
     void startCheck(bool manual);
-    void checkWithCurl(int dohIndex); // fallback when the computer's DNS fails
-    void handleReleases(const QByteArray &json);
+    // Download url; if the computer can't look up names, retry through public
+    // DNS with curl. done(ok, data, plain-language error).
+    void fetch(const QString &url, bool json, std::function<void(bool, const QByteArray &, const QString &)> done);
+    void fetchWithCurl(const QString &url, bool json, int dohIndex,
+                       std::function<void(bool, const QByteArray &, const QString &)> done);
+    void decide(const QByteArray &releasesJson, const QByteArray &mainCmake);
     void fail(const QString &message);
 
     QNetworkAccessManager m_net;

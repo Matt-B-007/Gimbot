@@ -153,6 +153,47 @@ latest_tag() { # latest_tag stable|beta
     printf '%s\n' "$json" | json_field tag_name
 }
 
+# The version in the files on the main branch (what was last uploaded),
+# e.g. v0.1.0-beta.7, or nothing if it can't be read.
+main_tag() {
+    local cm v
+    cm="$(net -fsSL --max-time 20 "https://raw.githubusercontent.com/$REPO/main/CMakeLists.txt")" || return 1
+    v="$(printf '%s\n' "$cm" | sed -nE 's/^set\(GIMBOT_VERSION "([^"]+)".*/\1/p' | head -n1)"
+    [[ -n "$v" ]] || return 1
+    echo "v$v"
+}
+
+# Is tag $1 newer than tag $2? Empty counts as oldest. Betas come before the
+# release they lead to (v0.1.0-beta.7 < v0.1.0 < v0.1.1-beta.1), as in the app.
+newer_tag() {
+    [[ -n "$1" ]] || return 1
+    [[ -n "$2" ]] || return 0
+    local a="${1#v}" b="${2#v}" ca cb pa pb i x y
+    ca="${a%%-*}"; cb="${b%%-*}"
+    [[ "$a" == *-* ]] && pa="${a#*-}" || pa=""
+    [[ "$b" == *-* ]] && pb="${b#*-}" || pb=""
+    local -a na nb
+    IFS=. read -ra na <<<"$ca"; IFS=. read -ra nb <<<"$cb"
+    for (( i = 0; i < 4; i++ )); do
+        x="${na[i]:-0}"; y="${nb[i]:-0}"
+        (( 10#$x > 10#$y )) && return 0
+        (( 10#$x < 10#$y )) && return 1
+    done
+    [[ "$pa" == "$pb" ]] && return 1
+    [[ -z "$pa" ]] && return 0   # release beats its betas
+    [[ -z "$pb" ]] && return 1
+    IFS=. read -ra na <<<"$pa"; IFS=. read -ra nb <<<"$pb"
+    for (( i = 0; i < 6; i++ )); do
+        x="${na[i]:-}"; y="${nb[i]:-}"
+        [[ "$x" == "$y" ]] && continue
+        [[ -z "$x" ]] && return 1
+        [[ -z "$y" ]] && return 0
+        if [[ "$x" =~ ^[0-9]+$ && "$y" =~ ^[0-9]+$ ]]; then (( 10#$x > 10#$y )); return; fi
+        [[ "$x" > "$y" ]]; return
+    done
+    return 1
+}
+
 saved_channel() {
     [[ -f "$CONFIG" ]] || return 0
     case "$(sed -nE 's/^updateChannel=([0-9]+).*/\1/p' "$CONFIG" | tail -n1)" in
@@ -179,6 +220,15 @@ selftest() {
     printf 'project(gimbot VERSION 0.1.0 LANGUAGES CXX)\nset(GIMBOT_VERSION "0.1.0-beta.4")\n' >"$srcdir/CMakeLists.txt"
     t "source tag"    "$(source_tag "$srcdir")" "v0.1.0-beta.4"
     t "beta pkgver"   "$(pkgver_from_tag "$(source_tag "$srcdir")")" "0.1.0beta4"
+    nt() { newer_tag "$1" "$2" && echo yes || echo no; }
+    t "beta older"    "$(nt v0.1.0-beta.7 v0.1.0)" "no"
+    t "release newer" "$(nt v0.1.0 v0.1.0-beta.7)" "yes"
+    t "next beta"     "$(nt v0.1.1-beta.1 v0.1.0)" "yes"
+    t "beta 10 > 9"   "$(nt v0.1.0-beta.10 v0.1.0-beta.9)" "yes"
+    t "same"          "$(nt v0.1.0-beta.7 v0.1.0-beta.7)" "no"
+    t "minor"         "$(nt v0.2.0 v0.10.0)" "no"
+    t "empty oldest"  "$(nt v0.1.0 "")" "yes"
+    t "empty newer"   "$(nt "" v0.1.0)" "no"
     rm -rf "$srcdir"
     local tmp; tmp="$(mktemp -d)"
     HOME="$tmp" SDK_CACHE="$tmp/cache"; mkdir -p "$tmp/Downloads" "$tmp/cache"
@@ -256,7 +306,12 @@ fi
 [[ "$channel" == beta || "$channel" == stable || -z "$channel" ]] || die "--channel must be stable or beta" 2
 
 if (( check_only )); then
-    latest_tag "${channel:-stable}" || { [[ "${channel:-stable}" == stable ]] && latest_tag beta; } || die "couldn't reach GitHub: $(net_problem)"
+    rel="$(latest_tag "${channel:-stable}" || true)"
+    [[ -n "$rel" || "${channel:-stable}" != stable ]] || rel="$(latest_tag beta || true)"
+    upl="$(main_tag || true)"
+    if newer_tag "$upl" "$rel"; then echo "$upl (uploaded, not released)"
+    elif [[ -n "$rel" ]]; then echo "$rel"
+    else die "couldn't reach GitHub: $(net_problem)"; fi
     exit 0
 fi
 
@@ -296,15 +351,29 @@ fi
 
 step 15 "Finding the OBSBOT SDK"
 if [[ -z "$sdk" ]]; then sdk="$(find_sdk_zip || true)"; fi
+if [[ -z "$sdk" || ! -f "$sdk" ]] && { (( assume_yes )) || [[ ! -r /dev/tty ]]; }; then
+    die "the OBSBOT SDK zip wasn't found. Put libdev_*.zip (emailed by OBSBOT, apply at https://obsbot.com/sdk) in your Downloads folder and try again." 3
+fi
+shown_help=0
 while [[ -z "$sdk" || ! -f "$sdk" ]]; do
-    if (( assume_yes )); then
-        die "the OBSBOT SDK zip wasn't found. Put libdev_*.zip (emailed by OBSBOT, apply at https://obsbot.com/sdk) in your Downloads folder and try again." 3
+    # Wait for it instead of giving up, so the one-line install finishes in one go.
+    if (( ! shown_help )); then
+        echo
+        echo "    ${bold}Gimbot needs the OBSBOT SDK${reset}, a zip named like libdev_v2.1.0_8.zip."
+        echo "    OBSBOT emails it to you when you apply at https://obsbot.com/sdk"
+        echo "    (it can't be shared on GitHub). Save it to your Downloads folder."
+        echo
+        shown_help=1
     fi
-    echo "    The OBSBOT SDK zip (libdev_*.zip) isn't in your Downloads folder."
-    echo "    OBSBOT emails it to you when you apply at https://obsbot.com/sdk"
-    sdk="$(ask "    Drag the zip here or type its path (empty to quit):" "")"
-    sdk="${sdk//\'/}"; sdk="${sdk/#\~/$HOME}"; sdk="${sdk/#file:\/\//}"
-    [[ -n "$sdk" ]] || die "no SDK, nothing installed" 3
+    answer="$(ask "    Press Enter once it's in Downloads (or drag the zip here, or type q to quit):" "")"
+    answer="${answer//\'/}"; answer="${answer/#\~/$HOME}"; answer="${answer/#file:\/\//}"
+    case "$answer" in
+        q|Q|quit) die "no SDK, nothing installed. Run the same command again once you have it." 3 ;;
+        "") sdk="$(find_sdk_zip || true)"
+            [[ -n "$sdk" ]] || echo "    Not found in $HOME/Downloads yet." ;;
+        *) sdk="$answer"
+           [[ -f "$sdk" ]] || echo "    There's no file at $sdk" ;;
+    esac
 done
 mkdir -p "$SDK_CACHE"
 if [[ "$(dirname "$(readlink -f "$sdk")")" != "$(readlink -f "$SDK_CACHE")" ]]; then
@@ -334,31 +403,47 @@ if [[ -n "$source_dir" ]]; then
     tag="$(source_tag "$src")"
 else
     if [[ -z "$version" ]]; then
-        step 20 "Looking up the newest $channel release"
-        version="$(latest_tag "$channel" || true)"
+        # The newest of: published releases, and the files last uploaded to
+        # the main branch (so uploading is enough; a release is optional).
+        step 20 "Looking up the newest $channel version"
+        rel="$(latest_tag "$channel" || true)"
+        upl="$(main_tag || true)"
+        upl_ok="$upl"
+        [[ "$channel" == stable && "$upl" == *-* ]] && upl_ok=""
+        version="$rel"
+        if newer_tag "$upl_ok" "$version"; then version=main; fi
         if [[ -z "$version" && "$channel" == stable ]]; then
-            # No normal release yet: install the newest beta and follow betas.
+            # Nothing stable yet: install the newest beta and follow betas.
             version="$(latest_tag beta || true)"
+            if newer_tag "$upl" "$version"; then version=main; fi
             if [[ -n "$version" ]]; then
                 channel=beta
-                info "There's no normal release yet, so this installs the newest beta ($version) and follows beta updates."
+                info "There's no normal release yet, so this installs the newest beta and follows beta updates."
                 info "You can switch to normal releases later in Settings › App."
             fi
         fi
         if [[ -z "$version" ]]; then
             if net -fsS --max-time 20 -o /dev/null "https://api.github.com/repos/$REPO"; then
-                die "github.com/$REPO has no published releases yet. Publish one on the Releases page first"
+                die "couldn't find Gimbot's files on github.com/$REPO"
             fi
             die "couldn't reach GitHub: $(net_problem)"
         fi
     fi
-    tag="$version"
-    step 25 "Downloading Gimbot $tag"
-    net -fsSL --max-time 300 "https://github.com/$REPO/archive/refs/tags/$tag.tar.gz" -o "$work/src.tar.gz" \
-        || die "couldn't download $tag: $(net_problem)"
+    if [[ "$version" == main ]]; then
+        step 25 "Downloading the latest uploaded Gimbot"
+        url="https://github.com/$REPO/archive/refs/heads/main.tar.gz"
+    else
+        step 25 "Downloading Gimbot $version"
+        url="https://github.com/$REPO/archive/refs/tags/$version.tar.gz"
+    fi
+    net -fsSL --max-time 300 "$url" -o "$work/src.tar.gz" || die "couldn't download Gimbot: $(net_problem)"
     mkdir -p "$work/src"
     tar -xzf "$work/src.tar.gz" -C "$work/src" --strip-components=1
     src="$work/src"
+    # The real version is whatever the downloaded files say.
+    tag="$(source_tag "$src")"
+    [[ "$tag" != "v" ]] || tag="$version"
+    info "Version $tag"
 fi
 pkgver="$(pkgver_from_tag "$tag")"
 app_repo="$REPO"

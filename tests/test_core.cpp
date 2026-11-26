@@ -180,6 +180,50 @@ private slots:
         QCOMPARE(run(*cam, {}), 2);
     }
 
+    void updateChoice()
+    {
+        const QByteArray rel = R"([{"tag_name":"v0.1.0-beta.6","prerelease":true,"draft":false,"body":"old"},
+                                   {"tag_name":"v0.0.9","prerelease":false,"draft":false},
+                                   {"tag_name":"v9.9.9","prerelease":false,"draft":true}])";
+        const QByteArray up8 = "project(gimbot VERSION 0.1.0)\nset(GIMBOT_VERSION \"0.1.0-beta.8\")\n";
+        const QByteArray up7 = "set(GIMBOT_VERSION \"0.1.0-beta.7\")\n";
+        const QByteArray upStable = "set(GIMBOT_VERSION \"0.1.0\")\n";
+        // Beta channel: uploaded beta.8 beats the beta.6 release.
+        auto c = Updater::choose(rel, up8, "0.1.0-beta.7", 2);
+        QVERIFY(c.valid);
+        QCOMPARE(c.version, QString("0.1.0-beta.8"));
+        QCOMPARE(c.tag, QString("main"));
+        QVERIFY(c.uploaded && c.beta);
+        // Uploaded = what's installed: nothing to do. Drafts never count.
+        QVERIFY(Updater::choose(rel, up7, "0.1.0-beta.7", 2).version.isEmpty());
+        // No releases at all: the upload alone is enough.
+        QCOMPARE(Updater::choose("[]", up8, "0.1.0-beta.7", 2).tag, QString("main"));
+        // Normal channel ignores an uploaded beta…
+        c = Updater::choose(rel, up8, "0.0.8", 1);
+        QCOMPARE(c.version, QString("0.0.9"));
+        QCOMPARE(c.tag, QString("v0.0.9"));
+        // …but takes an uploaded normal version.
+        QCOMPARE(Updater::choose(rel, upStable, "0.0.9", 1).tag, QString("main"));
+        // On a beta, switching to normal offers the newest normal one (a step back).
+        c = Updater::choose(rel, up8, "0.1.0-beta.7", 1);
+        QVERIFY(c.isSwitch);
+        QCOMPARE(c.version, QString("0.0.9"));
+        // Can't read the upload: releases still work.
+        QCOMPARE(Updater::choose(rel, {}, "0.1.0-beta.5", 2).tag, QString("v0.1.0-beta.6"));
+        // Garbage from GitHub.
+        QVERIFY(!Updater::choose("<html>", up8, "0.1.0", 2).valid);
+    }
+
+    void changelogNotes()
+    {
+        const QByteArray log = "# Changelog\n\n## 0.1.0-beta.8 (2026-11-26)\n- New thing\n- Fix\n\n## 0.1.0-beta.7\n- Older\n";
+        QCOMPARE(Updater::changelogSection(log, "0.1.0-beta.8"), QString("- New thing\n- Fix"));
+        QCOMPARE(Updater::changelogSection(log, "0.1.0-beta.7"), QString("- Older"));
+        QCOMPARE(Updater::changelogSection(log, "0.2.0"), QString());
+        QCOMPARE(Updater::changelogSection("## 0.1.0-beta.10\n- ten\n## 0.1.0-beta.1\n- one\n", "0.1.0-beta.1"), QString("- one"));
+        QCOMPARE(Updater::versionInCmake("x\nset(GIMBOT_VERSION \"1.2.3-beta.1\")\n"), QString("1.2.3-beta.1"));
+    }
+
     void previewFormat()
     {
         using F = preview::Format;
