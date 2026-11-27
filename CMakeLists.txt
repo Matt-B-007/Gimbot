@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 project(gimbot VERSION 0.1.0 LANGUAGES CXX)
 # The full version, including any pre-release part. project() only accepts
 # numbers, so this is what the app, the installer and the package use.
-set(GIMBOT_VERSION "0.1.0-beta.8")
+set(GIMBOT_VERSION "0.1.0-beta.9")
 if(NOT GIMBOT_VERSION MATCHES "^${PROJECT_VERSION}(-[0-9A-Za-z.]+)?$")
     message(FATAL_ERROR "GIMBOT_VERSION (${GIMBOT_VERSION}) must start with the project version (${PROJECT_VERSION})")
 endif()

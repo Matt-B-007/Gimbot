@@ -19,33 +19,38 @@ Rectangle {
     readonly property size videoSize: videoRunning ? qcam.cameraFormat.resolution : Qt.size(0, 0)
     readonly property real videoFps: videoRunning ? qcam.cameraFormat.maxFrameRate : 0
 
-    // Pick the sharpest smooth format for the preview's size on screen (or
-    // the user's choice). Debounced so resizing the window doesn't restart
-    // the video on every pixel.
+    // Pick the format: the user's resolution and frame rate if they chose one
+    // the camera offers, otherwise the sharpest smooth one for the preview's
+    // size on screen. Debounced so resizing doesn't restart the video on
+    // every pixel.
+    readonly property string choice: cam.values.previewChoice || ""
+    readonly property bool autoQuality: choice.length === 0
+    // What the camera really offers, for the menu.
+    readonly property var formatChoices: root.device !== null ? platform.previewChoices(root.device) : []
+    readonly property string currentLabel: videoRunning && videoSize.width > 0
+        ? platform.formatLabel(videoSize.width, videoSize.height, Math.round(videoFps)) : ""
     readonly property int targetHeight: Math.round(height * Screen.devicePixelRatio)
     onTargetHeightChanged: formatTimer.restart()
     onDeviceChanged: formatTimer.restart()
     Connections {
         target: cam
-        function onValuesChanged() { if (cam.values.previewQuality !== root.appliedQuality) formatTimer.restart() }
+        function onValuesChanged() { if (root.choice !== root.appliedFor) formatTimer.restart() }
     }
-    property int appliedQuality: -1
     property var appliedDevice: null
-    property int appliedFor: -1
+    property string appliedFor: "-" // the choice last applied ("-": none yet)
     function chooseFormat() {
         if (root.device === null) return
-        appliedQuality = cam.values.previewQuality
-        const f = platform.previewFormat(root.device, root.targetHeight, cam.values.previewQuality)
+        const f = platform.previewFormat(root.device, root.targetHeight, root.choice)
         if (f.resolution.width <= 0) return
         const cur = qcam.cameraFormat
         if (cur.resolution.width === f.resolution.width && cur.resolution.height === f.resolution.height
                 && cur.maxFrameRate === f.maxFrameRate && cur.pixelFormat === f.pixelFormat) return
         // Changing format restarts the video, so in Auto only step up when the
         // window grows; a sharper picture in a smaller window is fine.
-        const sameChoice = appliedDevice === root.device && appliedFor === cam.values.previewQuality
-        if (cam.values.previewQuality === 0 && sameChoice && cur.resolution.height >= f.resolution.height) return
+        const sameChoice = appliedDevice === root.device && appliedFor === root.choice
         appliedDevice = root.device
-        appliedFor = cam.values.previewQuality
+        appliedFor = root.choice
+        if (root.autoQuality && sameChoice && cur.resolution.height >= f.resolution.height) return
         qcam.cameraFormat = f
     }
     Timer { id: formatTimer; interval: 500; onTriggered: root.chooseFormat() }
@@ -280,7 +285,7 @@ Rectangle {
                     focusPolicy: Qt.StrongFocus
                     Accessible.name: qsTr("Preview quality: %1").arg(qText.text)
                     onClicked: qualityMenu.popup(qualityBtn, 0, qualityBtn.height + 6)
-                    Tip { visible: qualityBtn.hovered && !qualityMenu.visible; text: qsTr("Quality of this preview only. Zoom, OBS and other apps choose their own.") }
+                    Tip { visible: qualityBtn.hovered && !qualityMenu.visible; text: qsTr("Resolution and frame rate of this preview only; Zoom, OBS and other apps choose their own. 30 fps can look brighter in a dim room.") }
                     background: Rectangle {
                         radius: 14
                         color: qualityBtn.hovered || qualityMenu.visible ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
@@ -292,11 +297,8 @@ Rectangle {
                         spacing: 6
                         Text {
                             id: qText
-                            text: {
-                                const label = [qsTr("Auto"), "720p", "1080p", "4K"][cam.values.previewQuality] || qsTr("Auto")
-                                if (root.videoSize.width <= 0) return label
-                                return root.videoSize.width + "×" + root.videoSize.height + " · " + Math.round(root.videoFps) + " fps"
-                            }
+                            text: root.currentLabel.length === 0 ? qsTr("Auto")
+                                : root.autoQuality ? qsTr("Auto · %1").arg(root.currentLabel) : root.currentLabel
                             color: "#e6e8eb"
                             font.family: Theme.font
                             font.pixelSize: Theme.small
@@ -323,16 +325,24 @@ Rectangle {
 
     StyledMenu {
         id: qualityMenu
+        // Auto first, then every resolution and frame rate the camera offers.
         Instantiator {
-            model: [qsTr("Auto (sharpest for this window)"), qsTr("720p"), qsTr("1080p"), qsTr("4K")]
+            model: [{ key: "", label: root.autoQuality && root.currentLabel.length > 0
+                                     ? qsTr("Auto (now %1)").arg(root.currentLabel)
+                                     : qsTr("Auto (sharpest for this window)") }].concat(root.formatChoices)
             delegate: MenuEntry {
                 required property int index
-                required property string modelData
-                text: (cam.values.previewQuality === index ? "✓  " : "     ") + modelData
-                onTriggered: cam.set("previewQuality", index)
+                required property var modelData
+                text: (root.choice === modelData.key ? "✓  " : "     ") + modelData.label
+                onTriggered: cam.set("previewChoice", modelData.key)
             }
             onObjectAdded: (index, object) => qualityMenu.insertItem(index, object)
             onObjectRemoved: (index, object) => qualityMenu.removeItem(object)
+        }
+        MenuEntry {
+            visible: root.formatChoices.length === 0
+            text: qsTr("     More choices appear when the camera's video is available")
+            enabled: false
         }
     }
 

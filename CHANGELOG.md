@@ -3,6 +3,12 @@
 What changed in each version of Gimbot. The newest is at the top; the app
 shows a version's notes in its update window.
 
+## 0.1.0-beta.9 (2026-11-26)
+- The preview quality menu lists every resolution and frame rate the camera
+  really offers (for example 1080p · 60 fps, 1080p · 30 fps, 4K · 30 fps),
+  plus Auto. Combinations the camera can't do never appear, and the preview
+  bar shows which one is in use. 30 fps can look brighter in a dim room.
+
 ## 0.1.0-beta.8 (2026-11-25)
 - One line installs Gimbot straight from the uploaded files, with no release
   needed. If the OBSBOT SDK isn't in Downloads, the installer explains where to

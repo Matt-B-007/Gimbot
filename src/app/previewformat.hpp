@@ -21,4 +21,18 @@ struct Format {
 // preferring the smoother frame rate), 1 = 720p, 2 = 1080p, 3 = 4K. Returns an index into formats, or -1 if it is empty.
 int choose(const std::vector<Format> &formats, int targetHeight, int quality);
 
+// One entry in the preview quality menu: a resolution and frame rate the
+// camera really offers. Several formats (raw, MJPEG) can share one entry.
+struct Choice {
+    int width = 0, height = 0, fps = 0;
+    int format = -1; // index of the best format for it (raw wins a tie)
+};
+
+// Every distinct resolution + frame rate, sharpest first, then fastest.
+// Formats below 15 fps are left out (too choppy to be worth offering).
+std::vector<Choice> choices(const std::vector<Format> &formats);
+
+// The format for a menu entry, or -1 if this camera doesn't offer it.
+int find(const std::vector<Format> &formats, int width, int height, int fps);
+
 } // namespace preview

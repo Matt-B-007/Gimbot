@@ -415,19 +415,58 @@ int DBusService::Run(const QStringList &args, QString &output)
     return 0;
 }
 
-QCameraFormat Platform::previewFormat(const QCameraDevice &device, int targetHeight, int quality) const
+static std::vector<preview::Format> formatsOf(const QList<QCameraFormat> &all)
 {
-    const QList<QCameraFormat> all = device.videoFormats();
     std::vector<preview::Format> list;
     for (const auto &f : all)
         list.push_back({f.resolution().width(), f.resolution().height(), f.maxFrameRate(),
                         f.pixelFormat() == QVideoFrameFormat::Format_Jpeg});
-    const int i = preview::choose(list, targetHeight, quality);
+    return list;
+}
+
+QCameraFormat Platform::previewFormat(const QCameraDevice &device, int targetHeight, const QString &choice) const
+{
+    const QList<QCameraFormat> all = device.videoFormats();
+    const auto list = formatsOf(all);
+    int i = -1;
+    // A chosen resolution and frame rate, if this camera offers it…
+    static const QRegularExpression re(QStringLiteral("^(\\d+)x(\\d+)@(\\d+)$"));
+    const auto m = re.match(choice);
+    if (m.hasMatch()) i = preview::find(list, m.captured(1).toInt(), m.captured(2).toInt(), m.captured(3).toInt());
+    // …otherwise Auto.
+    if (i < 0) i = preview::choose(list, targetHeight, 0);
     if (i < 0) return {};
-    qInfo().noquote() << QStringLiteral("Preview format: %1x%2 at %3 fps%4")
+    qInfo().noquote() << QStringLiteral("Preview format: %1x%2 at %3 fps%4%5")
                              .arg(all[i].resolution().width())
                              .arg(all[i].resolution().height())
                              .arg(all[i].maxFrameRate())
-                             .arg(list[size_t(i)].compressed ? QStringLiteral(" (MJPEG)") : QString());
+                             .arg(list[size_t(i)].compressed ? QStringLiteral(" (MJPEG)") : QString())
+                             .arg(m.hasMatch() ? QString() : QStringLiteral(" (auto)"));
     return all[i];
+}
+
+QVariantList Platform::previewChoices(const QCameraDevice &device) const
+{
+    QVariantList out;
+    for (const auto &c : preview::choices(formatsOf(device.videoFormats()))) {
+        QVariantMap m;
+        m["key"] = QStringLiteral("%1x%2@%3").arg(c.width).arg(c.height).arg(c.fps);
+        m["label"] = formatLabel(c.width, c.height, c.fps);
+        m["width"] = c.width;
+        m["height"] = c.height;
+        m["fps"] = c.fps;
+        out << m;
+    }
+    return out;
+}
+
+QString Platform::formatLabel(int width, int height, int fps) const
+{
+    QString res;
+    if (width == 3840 && height == 2160) res = QStringLiteral("4K");
+    else if (width * 9 == height * 16 && (height == 360 || height == 480 || height == 540 || height == 720 ||
+                                           height == 1080 || height == 1440))
+        res = QStringLiteral("%1p").arg(height);
+    else res = QStringLiteral("%1×%2").arg(width).arg(height);
+    return fps > 0 ? tr("%1 · %2 fps").arg(res).arg(fps) : res;
 }

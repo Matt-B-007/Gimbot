@@ -244,7 +244,7 @@ void Controller::defineSettings()
     def("lastTrackingMode", Kind::App, 2, {});  // mode the tracking switch turns on
     def("autoResume", Kind::App, false, {});    // resume tracking after a manual move
     def("autoResumeSeconds", Kind::App, 5, {});
-    def("previewQuality", Kind::App, 0, {});    // 0 auto (sharpest), 1 720p, 2 1080p, 3 4K
+    def("previewChoice", Kind::App, QString(), {}); // "" auto, or e.g. "1920x1080@60"
     def("tourDone", Kind::App, false, {});
     def("startupPreset", Kind::App, -2, {});   // -2 not chosen here, -1 straight ahead, else preset id
     def("moreAim", Kind::App, false, {});      // "More" sections on the main screen

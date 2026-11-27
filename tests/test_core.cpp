@@ -246,6 +246,32 @@ private slots:
         QCOMPARE(preview::choose({}, 400, 0), -1);
     }
 
+    void previewChoices()
+    {
+        using F = preview::Format;
+        const std::vector<F> tiny2 = {{640, 360, 30, false},  {1280, 720, 60, true},  {1280, 720, 30, true},
+                                      {1280, 720, 30, false}, {1920, 1080, 60, true}, {1920, 1080, 30, true},
+                                      {1920, 1080, 5, false}, {3840, 2160, 30, true}, {3840, 2160, 15, false}};
+        const auto list = preview::choices(tiny2);
+        // Sharpest first, then fastest; one entry per resolution + frame rate.
+        QCOMPARE(int(list.size()), 7);
+        QCOMPARE(list[0].height, 2160);
+        QCOMPARE(list[0].fps, 30);
+        QCOMPARE(list[1].fps, 15);
+        QCOMPARE(list[2].height, 1080);
+        QCOMPARE(list[2].fps, 60);
+        QCOMPARE(list[3].fps, 30);
+        // 1080p at 5 fps is too slow to offer.
+        for (const auto &c : list) QVERIFY(c.fps >= 15);
+        // 720p30 comes as MJPEG and raw: raw is used.
+        QCOMPARE(preview::find(tiny2, 1280, 720, 30), 3);
+        QCOMPARE(preview::find(tiny2, 3840, 2160, 30), 7);
+        // Not offered (4K at 60, or a different camera's mode).
+        QCOMPARE(preview::find(tiny2, 3840, 2160, 60), -1);
+        QCOMPARE(preview::find(tiny2, 2560, 1440, 30), -1);
+        QVERIFY(preview::choices({}).empty());
+    }
+
     void versions()
     {
         QCOMPARE(Updater::compareVersions("1.2.0", "1.10.0"), -1);

@@ -75,7 +75,13 @@ public:
     Q_INVOKABLE bool adoptSdk(const QString &pathOrUrl);
     Q_INVOKABLE void openSdkFolder();
     // The sharpest smooth video format for the preview (see previewformat.hpp).
-    Q_INVOKABLE QCameraFormat previewFormat(const QCameraDevice &device, int targetHeight, int quality) const;
+    // choice: "" for Auto, or a key from previewChoices() such as "1920x1080@60".
+    Q_INVOKABLE QCameraFormat previewFormat(const QCameraDevice &device, int targetHeight, const QString &choice) const;
+    // The resolutions and frame rates this camera really offers, for the
+    // preview quality menu: [{key, label, width, height, fps}], sharpest first.
+    Q_INVOKABLE QVariantList previewChoices(const QCameraDevice &device) const;
+    // "1080p · 60 fps", "4K · 30 fps", "1280×800 · 30 fps"…
+    Q_INVOKABLE QString formatLabel(int width, int height, int fps) const;
 
 signals:
     void showRequested();

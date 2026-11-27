@@ -49,4 +49,35 @@ int choose(const std::vector<Format> &formats, int targetHeight, int quality)
     return best;
 }
 
+std::vector<Choice> choices(const std::vector<Format> &formats)
+{
+    std::vector<Choice> out;
+    for (int i = 0; i < int(formats.size()); ++i) {
+        const Format &f = formats[size_t(i)];
+        const int fps = int(f.maxFps + 0.5f);
+        if (f.width <= 0 || f.height <= 0 || fps < 15) continue;
+        auto it = std::find_if(out.begin(), out.end(), [&](const Choice &c) {
+            return c.width == f.width && c.height == f.height && c.fps == fps;
+        });
+        if (it == out.end()) {
+            out.push_back({f.width, f.height, fps, i});
+        } else if (formats[size_t(it->format)].compressed && !f.compressed) {
+            it->format = i; // same picture without decoding
+        }
+    }
+    std::sort(out.begin(), out.end(), [](const Choice &a, const Choice &b) {
+        if (a.height != b.height) return a.height > b.height;
+        if (a.width != b.width) return a.width > b.width;
+        return a.fps > b.fps;
+    });
+    return out;
+}
+
+int find(const std::vector<Format> &formats, int width, int height, int fps)
+{
+    for (const auto &c : choices(formats))
+        if (c.width == width && c.height == height && c.fps == fps) return c.format;
+    return -1;
+}
+
 } // namespace preview
