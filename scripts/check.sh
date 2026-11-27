@@ -164,8 +164,14 @@ qml_files=("$lint_dir"/Gimbot/*.qml)
 # Qt Quick's own rules (e.g. Quick.layout-positioning) live in a qmllint
 # plugin. Arch's qmllint has it; some copies (PySide6's) don't, and then
 # those rules would silently not run. CI must have it.
-if "$qmllint" --list-plugins 2>/dev/null | grep -qi "quick"; then
-    echo "qmllint has the Qt Quick plugin"
+# Test it directly: lint a tiny file that breaks one of those rules on
+# purpose and see whether qmllint notices.
+probe_dir="$lint_dir/probe"
+mkdir -p "$probe_dir"
+printf 'import QtQuick\nimport QtQuick.Layouts\nRowLayout {\n    Rectangle { width: 1 }\n}\n' > "$probe_dir/Probe.qml"
+probe_out="$(cd "$probe_dir" && "$qmllint" --ignore-settings "$probe_dir/Probe.qml" 2>&1 || true)"
+if [[ "$probe_out" == *layout-positioning* ]]; then
+    echo "qmllint has the Qt Quick plugin (it caught a planted layout mistake)"
 elif [[ -n "${GITHUB_ACTIONS:-}" ]]; then
     fail "this qmllint has no Qt Quick plugin, so Qt Quick's rules wouldn't be checked"
 else

@@ -3,6 +3,14 @@
 What changed in each version of Gimbot. The newest is at the top; the app
 shows a version's notes in its update window.
 
+## 0.1.0-beta.15 (2026-11-27)
+Beta.14 again, with its new check fixed. Nothing for you to notice.
+- **The check for Qt Quick's lint rules gave a false alarm** on GitHub, so
+  beta.14 was never published. It asked qmllint for a list of its plugins,
+  which didn't work as expected; it now plants a small layout mistake and
+  checks that qmllint reports it, which is a sure test.
+- Beta.13 and beta.14 were never signed, so your Gimbot skips them.
+
 ## 0.1.0-beta.14 (2026-11-27)
 Beta.13 again, with the last QML lint warnings fixed so it passes GitHub's
 checks and arrives as a signed update. Nothing for you to notice.
