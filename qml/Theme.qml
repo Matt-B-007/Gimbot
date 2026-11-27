@@ -3,6 +3,8 @@ import QtQuick
 
 // Colors, type and spacing for the whole app. Follows the system's light or
 // dark setting (or the user's override) and can use the Plasma accent color.
+// Every text color passes 4.5:1 on every background in both themes; the
+// contrast test (tests/test_theme.cpp) checks it.
 QtObject {
     id: t
 
@@ -35,10 +37,10 @@ QtObject {
     readonly property color hover: dark ? Qt.rgba(1, 1, 1, 0.05) : Qt.rgba(0, 0, 0, 0.04)
     readonly property color text: dark ? "#f2f3f5" : "#14161a"
     readonly property color textMuted: dark ? "#9aa0a8" : "#596069"
-    readonly property color textFaint: dark ? "#6f757d" : "#858b94"
+    readonly property color textFaint: dark ? "#868c94" : "#636970"
     readonly property color danger: dark ? "#ff8a80" : "#c62828"
-    readonly property color success: dark ? "#4ade80" : "#1f9d55"
-    readonly property color warning: dark ? "#f0b45c" : "#a8660b"
+    readonly property color success: dark ? "#4ade80" : "#136b3a"
+    readonly property color warning: dark ? "#f0b45c" : "#8f5a00"
     readonly property color overlay: Qt.rgba(0.055, 0.06, 0.067, 0.78) // chips on top of video
     readonly property color scrim: Qt.rgba(0, 0, 0, dark ? 0.55 : 0.35)
 

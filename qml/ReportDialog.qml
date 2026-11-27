@@ -3,15 +3,18 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // Gathers details for a bug report. Nothing leaves the computer unless the
-// user copies it or opens the pre-filled GitHub issue.
+// user saves or copies it, or opens a GitHub issue (summary and header only,
+// after a warning; the saved file is attached by hand).
 Sheet {
     id: root
     title: qsTr("Report a problem")
     iconName: "bug"
-    maxWidth: 640
+    maxWidth: 680
     signal done(string message)
+    property bool warnOnOpen: false // screenshots
+    function showGithubWarning() { warnOnOpen = true; githubWarning.visible = true }
 
-    onOpened: { summary.text = ""; what.text = ""; details.text = platform.diagnostics(serialBox.checked) }
+    onOpened: { summary.text = ""; what.text = ""; githubWarning.visible = warnOnOpen; warnOnOpen = false; details.text = platform.diagnostics(serialBox.checked) }
 
     Field { id: summary; Layout.fillWidth: true; placeholderText: qsTr("Short summary, e.g. “Zoom slider does nothing”") }
 
@@ -57,6 +60,8 @@ Sheet {
 
     ScrollView {
         Layout.fillWidth: true
+        // Long log lines scroll sideways instead of widening the dialog.
+        implicitWidth: 200
         Layout.preferredHeight: 190
         clip: true
         background: Rectangle { radius: Theme.radiusSm + 2; color: Theme.sunken; border.color: Theme.border }
@@ -83,25 +88,88 @@ Sheet {
         font.pixelSize: Theme.small
     }
 
+    // The warning before anything goes to GitHub.
+    Rectangle {
+        id: githubWarning
+        visible: false
+        Layout.fillWidth: true
+        implicitHeight: warnCol.implicitHeight + 24
+        radius: Theme.radiusSm + 2
+        color: Qt.rgba(Theme.warning.r, Theme.warning.g, Theme.warning.b, 0.12)
+        border.color: Theme.warning
+        ColumnLayout {
+            id: warnCol
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 8
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: platform.repoPublic
+                      ? qsTr("This creates a PUBLIC issue that anyone can read.")
+                      : qsTr("This creates an issue that only the owner of the repository can see.")
+                color: Theme.text
+                font.family: Theme.font
+                font.pixelSize: Theme.fontSize
+                font.weight: Font.DemiBold
+            }
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Only your summary and the first lines of the details (versions, system and camera) go into the issue. The full report is saved as a file in your Downloads folder; please attach it to the issue.")
+                color: Theme.textMuted
+                font.family: Theme.font
+                font.pixelSize: Theme.small
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                Btn { text: qsTr("Cancel"); variant: "ghost"; compact: true; onClicked: githubWarning.visible = false }
+                Btn {
+                    text: qsTr("Save the report and open GitHub")
+                    iconName: "external"
+                    compact: true
+                    onClicked: {
+                        if (platform.openIssue(summary.text, what.text, serialBox.checked)) {
+                            root.done(qsTr("Report saved. Attach %1 to the issue.").arg(platform.lastReport.split("/").pop()))
+                            platform.showSavedReport()
+                            root.close()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     buttons: [
         Btn { text: qsTr("Open log folder"); iconName: "folder"; variant: "ghost"; onClicked: platform.openLogFolder() },
+        Btn {
+            visible: platform.issuesConfigured
+            text: qsTr("Open on GitHub…")
+            iconName: "external"
+            variant: "ghost"
+            onClicked: githubWarning.visible = true
+        },
         Item { Layout.fillWidth: true },
         Btn {
             text: qsTr("Copy report")
             iconName: "copy"
             onClicked: {
-                platform.copyToClipboard((summary.text.length ? summary.text + "\n\n" : "") + (what.text.length ? what.text + "\n\n" : "") + details.text)
-                root.done(qsTr("Report copied to the clipboard"))
+                platform.copyToClipboard(platform.reportText(summary.text, what.text, serialBox.checked))
+                root.done(qsTr("Report copied"))
             }
         },
         Btn {
-            visible: platform.issuesConfigured
-            text: qsTr("Open on GitHub")
-            iconName: "external"
+            text: qsTr("Save to file")
+            iconName: "download"
             variant: "primary"
             onClicked: {
-                platform.openIssue(summary.text, what.text, serialBox.checked)
-                root.close()
+                const path = platform.saveReport(summary.text, what.text, serialBox.checked)
+                if (path.length > 0) {
+                    root.done(qsTr("Report saved to %1").arg(path.replace(/^.*\/(Downloads|[^/]+)\//, "$1/")))
+                    platform.showSavedReport()
+                    root.close()
+                }
             }
         }
     ]

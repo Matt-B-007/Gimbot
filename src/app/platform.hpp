@@ -23,7 +23,10 @@ class Platform : public QObject {
     Q_PROPERTY(QString system READ system CONSTANT)
     Q_PROPERTY(bool kdeIntegration READ kdeIntegration CONSTANT)
     Q_PROPERTY(bool trayAvailable READ trayAvailable NOTIFY trayChanged)
+    Q_PROPERTY(QString trayState READ trayState NOTIFY trayChanged)
     Q_PROPERTY(bool issuesConfigured READ issuesConfigured CONSTANT)
+    Q_PROPERTY(QString lastReport READ lastReport NOTIFY reportSaved)
+    Q_PROPERTY(bool repoPublic READ repoPublic CONSTANT)
     Q_PROPERTY(QString repoUrl READ repoUrl CONSTANT)
     Q_PROPERTY(bool previousSessionCrashed READ previousSessionCrashed NOTIFY crashChanged)
     Q_PROPERTY(QString logFile READ logFile CONSTANT)
@@ -43,7 +46,10 @@ public:
     QString system() const;
     bool kdeIntegration() const;
     bool trayAvailable() const { return m_trayAvailable; }
+    QString trayState() const { return m_trayState; }
     bool issuesConfigured() const { return !m_repo.isEmpty(); }
+    QString lastReport() const { return m_lastReport; }
+    bool repoPublic() const;
     QString repoUrl() const;
     bool previousSessionCrashed() const { return m_crashed; }
     QString logFile() const;
@@ -64,6 +70,11 @@ public:
 
     Q_INVOKABLE QString diagnostics(bool includeSerial = false) const;
     Q_INVOKABLE void copyToClipboard(const QString &text);
+    // The full report (summary, description, details and log), redacted.
+    Q_INVOKABLE QString reportText(const QString &title, const QString &description, bool includeSerial) const;
+    // Saves it to Downloads (or home); returns the path, or "" on failure.
+    Q_INVOKABLE QString saveReport(const QString &title, const QString &description, bool includeSerial);
+    Q_INVOKABLE void showSavedReport();
     Q_INVOKABLE bool openIssue(const QString &title, const QString &description, bool includeSerial);
     Q_INVOKABLE void openLogFolder();
     Q_INVOKABLE void openUrl(const QString &url);
@@ -89,12 +100,18 @@ signals:
     void quitRequested();
     void trayChanged();
     void crashChanged();
+    void reportSaved();
     void sdkChanged();
     void notice(const QString &message);
     void error(const QString &message);
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
     void rebuildMenu();
+    void updateTrayState();
+    QString redactText(const QString &text, bool includeSerial) const;
 
     Controller *m_cam;
     Updater *m_updater;
@@ -104,6 +121,9 @@ private:
     bool m_trayAvailable = false;
     bool m_menuOwnedByTray = false;
     bool m_crashed = false;
+    bool m_problem = false; // the camera reported an error in the last minute
+    QString m_trayState;
+    QString m_lastReport;
     QString m_newSdkPath, m_newSdkVersion;
 };
 

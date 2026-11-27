@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh |
 - **Automatic camera detection**: plug in and it connects; unplug and it waits
 - **Ctrl+K command search**, light/dark theme, optional Plasma accent color
 - **Tray icon** and **system-wide shortcuts** (KDE), start at login, stays out of the way
-- **Report a problem**: gathers versions and a log for a pre-filled GitHub issue; nothing is sent automatically
+- **Report a problem**: saves or copies a report with versions and a log (personal details hidden); nothing is sent automatically
 - **Updates from inside the app** for normal or beta releases, and **Uninstall** from Settings
 - **Made to be obvious**: hover hints with shortcuts, a first-run tour, Undo for resets and profile changes, plain-language errors with a Report button
 - **`gimbotctl`** for scripts and keyboard shortcuts, routed through the running app over D-Bus
@@ -60,8 +60,10 @@ offer them); use OBSBOT Center on Windows or macOS for those.
 
 ## Problems?
 
-- **In the app:** **Help (?) › Report a problem** gathers the details for a
-  GitHub issue. Nothing is sent without you seeing it.
+- **In the app:** **Help (?) › Report a problem** saves the details to a file
+  (or copies them) with your home folder, names, addresses and secrets hidden.
+  **Open on GitHub** makes a public issue with just the summary; attach the
+  saved file to it. Nothing is sent without you seeing it.
 - **"Can't reach GitHub":** check the internet connection, then press **Try
   again** in **Settings › App**. If the computer's DNS is broken, Gimbot and the
   installer ask a public DNS service instead.

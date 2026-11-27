@@ -27,6 +27,11 @@ Result migrate(QSettings &s)
         s.setValue("settings/tourDone", true);
         s.remove("settings/previewQuality");
     }
+    if (r.from >= 1 && r.from < 3) {
+        // Versions before this one didn't record which version last ran, so
+        // the first start after this update says "updated" without a number.
+        s.setValue("settings/lastRunVersion", QStringLiteral("earlier"));
+    }
     if (r.from != kCurrentVersion) {
         s.setValue(kVersionKey, kCurrentVersion);
         s.sync();

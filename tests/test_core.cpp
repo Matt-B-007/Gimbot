@@ -241,6 +241,7 @@ private slots:
             QVERIFY(r.newInstall);
             QCOMPARE(s.value("meta/settingsVersion").toInt(), settingsstore::kCurrentVersion);
             QVERIFY(!s.contains("settings/tourDone"));
+            QVERIFY(!s.contains("settings/lastRunVersion")); // no "updated" banner on a new install
         }
         // Existing install from before versions: tour marked seen, old key gone.
         {
@@ -253,6 +254,7 @@ private slots:
             QVERIFY(s.value("settings/tourDone").toBool());
             QVERIFY(!s.contains("settings/previewQuality"));
             QCOMPARE(s.value("settings/fov").toInt(), 1);
+            QCOMPARE(s.value("settings/lastRunVersion").toString(), QStringLiteral("earlier"));
             QCOMPARE(settingsstore::migrate(s).from, settingsstore::kCurrentVersion); // idempotent
         }
         // Written by a newer Gimbot (after Go back): left alone.

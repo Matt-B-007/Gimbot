@@ -21,6 +21,11 @@ ApplicationWindow {
     Component.onCompleted: {
         Theme.mode = Qt.binding(() => cam.values.theme)
         Theme.useSystemAccent = Qt.binding(() => cam.values.systemAccent)
+        // Once after an update: say so, with What's new and the tour.
+        // (New installs get the tour by itself instead.)
+        const last = cam.values.lastRunVersion
+        if (last && last !== platform.version && !screenshotMode) studio.updatedFrom = last
+        if (last !== platform.version) cam.set("lastRunVersion", platform.version)
     }
 
     // Live gimbal angles only while someone can see them.
@@ -53,6 +58,7 @@ ApplicationWindow {
         else page = "studio"
         if (name === "palette") palette.open()
         if (name === "report") report.open()
+        if (name === "report-github") { report.open(); report.showGithubWarning() }
         if (name === "about") about.open()
         if (name === "update") updateDialog.open()
         if (name === "updating") updater.install()

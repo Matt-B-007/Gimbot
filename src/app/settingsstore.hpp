@@ -8,7 +8,7 @@
 namespace settingsstore {
 
 // Bump when stored settings change shape, and add a step to migrate().
-constexpr int kCurrentVersion = 2;
+constexpr int kCurrentVersion = 3;
 
 struct Result {
     int from = 0;          // version found (0 = before versions existed)

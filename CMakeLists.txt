@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 project(gimbot VERSION 0.1.0 LANGUAGES CXX)
 # The full version, including any pre-release part. project() only accepts
 # numbers, so this is what the app, the installer and the package use.
-set(GIMBOT_VERSION "0.1.0-beta.10")
+set(GIMBOT_VERSION "0.1.0-beta.11")
 if(NOT GIMBOT_VERSION MATCHES "^${PROJECT_VERSION}(-[0-9A-Za-z.]+)?$")
     message(FATAL_ERROR "GIMBOT_VERSION (${GIMBOT_VERSION}) must start with the project version (${PROJECT_VERSION})")
 endif()
@@ -14,6 +14,7 @@ include(GNUInstallDirs)
 option(BUILD_GUI "Build the desktop app (otherwise only gimbotctl)" ON)
 option(WITH_KDE "Use KDE Frameworks for the tray, global shortcuts and crash reports when found" ON)
 set(GIMBOT_MIN_QT 6.8 CACHE STRING "Oldest Qt 6 version to accept")
+option(GIMBOT_REPO_PRIVATE "The GitHub repository is private (changes the bug report warning)" OFF)
 set(GIMBOT_REPO "Matt-B-007/Gimbot" CACHE STRING "GitHub owner/repo, used for update checks and bug reports (e.g. alex/gimbot)")
 set(OBSBOT_SDK_DIR "" CACHE PATH "Path to the extracted OBSBOT SDK (the folder containing include/ and linux/)")
 
@@ -179,6 +180,8 @@ if(BUILD_GUI)
         src/app/logger.cpp src/app/logger.hpp
         src/app/updater.cpp src/app/updater.hpp
         src/app/platform.cpp src/app/platform.hpp
+        src/app/trayicon.cpp src/app/trayicon.hpp
+        src/app/redact.cpp src/app/redact.hpp
         src/app/previewformat.cpp src/app/previewformat.hpp
         src/app/settingsstore.cpp src/app/settingsstore.hpp
         src/app/crashlog.cpp src/app/crashlog.hpp
@@ -226,6 +229,9 @@ if(BUILD_GUI)
     if(GIMBOT_HAVE_SDK)
         target_compile_definitions(gimbot PRIVATE GIMBOT_HAVE_SDK)
     endif()
+    if(GIMBOT_REPO_PRIVATE)
+        target_compile_definitions(gimbot PRIVATE GIMBOT_REPO_PRIVATE)
+    endif()
     target_compile_options(gimbot PRIVATE -Wall -Wextra -Wno-unused-parameter)
     if(GIMBOT_HAVE_KF6)
         target_link_libraries(gimbot PRIVATE KF6::CoreAddons KF6::Crash KF6::GlobalAccel KF6::StatusNotifierItem)
@@ -259,5 +265,14 @@ if(BUILD_TESTING)
         set_target_properties(gimbot_controller_tests PROPERTIES AUTOMOC ON)
         add_test(NAME gimbot_controller_tests COMMAND gimbot_controller_tests)
         set_tests_properties(gimbot_controller_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+        # Theme contrast, tray icon states and report redaction.
+        add_executable(gimbot_ui_tests tests/test_ui.cpp src/app/trayicon.cpp src/app/redact.cpp)
+        target_include_directories(gimbot_ui_tests PRIVATE src/app)
+        target_compile_definitions(gimbot_ui_tests PRIVATE GIMBOT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+        target_link_libraries(gimbot_ui_tests PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Test)
+        set_target_properties(gimbot_ui_tests PROPERTIES AUTOMOC ON)
+        add_test(NAME gimbot_ui_tests COMMAND gimbot_ui_tests)
+        set_tests_properties(gimbot_ui_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     endif()
 endif()

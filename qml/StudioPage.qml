@@ -8,6 +8,7 @@ FocusScope {
     property bool windowVisible: true
     property bool updateDismissed: false
     property bool sdkDismissed: false
+    property string updatedFrom: "" // set once after an update
     signal openPalette()
     signal openSettings()
     signal openReport()
@@ -126,6 +127,18 @@ FocusScope {
             actionText: qsTr("Report the problem")
             onAction: { root.openReport(); platform.dismissCrash() }
             onDismissed: platform.dismissCrash()
+        }
+        Banner { // once after an update
+            Layout.fillWidth: true
+            visible: root.updatedFrom.length > 0
+            iconName: "check"
+            tint: Theme.success
+            text: qsTr("Gimbot was updated to %1.").arg(platform.version)
+            actionText: platform.repoUrl ? qsTr("What's new") : ""
+            onAction: platform.openUrl(platform.repoUrl + "/releases/tag/v" + platform.version)
+            secondaryText: qsTr("Show the tour")
+            onSecondary: { root.updatedFrom = ""; root.openTour() }
+            onDismissed: root.updatedFrom = ""
         }
         Banner {
             Layout.fillWidth: true

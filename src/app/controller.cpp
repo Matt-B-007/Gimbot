@@ -259,6 +259,7 @@ void Controller::defineSettings()
     def("autoResumeSeconds", Kind::App, 5, {});
     def("previewChoice", Kind::App, QString(), {}); // "" auto, or e.g. "1920x1080@60"
     def("tourDone", Kind::App, false, {});
+    def("lastRunVersion", Kind::App, QString(), {}); // for "Gimbot was updated" once after an update
     def("startupPreset", Kind::App, -2, {});   // -2 not chosen here, -1 straight ahead, else preset id
     def("moreAim", Kind::App, false, {});      // "More" sections on the main screen
     def("moreTracking", Kind::App, false, {});

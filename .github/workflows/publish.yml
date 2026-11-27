@@ -100,7 +100,7 @@ jobs:
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
         run: |
           if [[ -z "$MINISIGN_SECRET_KEY" ]]; then
-            echo "::error::The repository secret MINISIGN_SECRET_KEY is missing, so the release can't be signed. Nothing was published."
+            echo "::error::MINISIGN_SECRET_KEY secret is missing, so this release can't be signed. Add it in Settings > Secrets and variables > Actions, then re-run."
             exit 1
           fi
 
@@ -118,18 +118,43 @@ jobs:
           git archive --format=tar.gz --prefix="Gimbot-$VERSION/" -o "dist/Gimbot-$VERSION-source.tar.gz" HEAD
           git archive --format=zip --prefix="Gimbot/" -o "dist/Gimbot-$VERSION-source.zip" HEAD
           (cd dist && sha256sum "Gimbot-$VERSION-source.tar.gz" "Gimbot-$VERSION-source.zip" > SHA256SUMS)
-          keyfile="$(mktemp)"
+          # The key only ever exists in this file, readable by us alone, and
+          # is removed straight after signing (also if signing fails).
+          key="$RUNNER_TEMP/minisign.key"
+          trap 'rm -f "$key"' EXIT
           # minisign wants its "untrusted comment:" first line; add it if the
           # secret was saved without it.
-          if [[ "$MINISIGN_SECRET_KEY" == "untrusted comment:"* ]]; then
-            printf '%s\n' "$MINISIGN_SECRET_KEY" > "$keyfile"
-          else
-            printf 'untrusted comment: minisign secret key\n%s\n' "$MINISIGN_SECRET_KEY" > "$keyfile"
+          (
+            umask 077
+            if [[ "$MINISIGN_SECRET_KEY" == "untrusted comment:"* ]]; then
+              printf '%s\n' "$MINISIGN_SECRET_KEY" > "$key"
+            else
+              printf 'untrusted comment: minisign secret key\n%s\n' "$MINISIGN_SECRET_KEY" > "$key"
+            fi
+          )
+          chmod 600 "$key"
+          minisign -S -s "$key" -m dist/SHA256SUMS -t "Gimbot v$VERSION" < /dev/null
+          rm -f "$key"
+
+      - name: Verify the signature with the embedded public keys (primary or backup)
+        if: steps.version.outputs.new == 'true'
+        run: |
+          # The same check install.sh and Update now make: either key will do.
+          primary=RWQcs3jtP2jTiAMafwQX8UwciSjOH4o9tQcCVvYl2NkdnOeVupKPlhvC
+          backup=RWRObC9qlP598z1kmTFw7W+TKYKk3w2/63qWyRWkvRSkqGwGEgjmOlGe
+          # Both keys must be the ones install.sh embeds.
+          for k in "$primary" "$backup"; do
+            if ! grep -qF "$k" install.sh; then echo "::error::install.sh doesn't embed public key $k"; exit 1; fi
+          done
+          ok=""
+          for k in "$primary" "$backup"; do
+            if minisign -Vm dist/SHA256SUMS -x dist/SHA256SUMS.minisig -P "$k" >/dev/null 2>&1; then ok="$k"; break; fi
+          done
+          if [[ -z "$ok" ]]; then
+            echo "::error::SHA256SUMS.minisig doesn't verify with either embedded public key. If signing said 'Error while loading the secret key file', the secret's contents are wrong: paste the key file again."
+            exit 1
           fi
-          minisign -S -s "$keyfile" -m dist/SHA256SUMS -t "Gimbot $VERSION" < /dev/null
-          rm -f "$keyfile"
-          # Check it the way the installer will, with the embedded public key.
-          minisign -Vm dist/SHA256SUMS -x dist/SHA256SUMS.minisig -P RWQcs3jtP2jTiAMafwQX8UwciSjOH4o9tQcCVvYl2NkdnOeVupKPlhvC
+          echo "Signature verified with public key ${ok:0:12}…"
           (cd dist && sha256sum -c SHA256SUMS)
           ls -l dist
 
@@ -153,8 +178,8 @@ jobs:
             echo "Downloads are checked with SHA256SUMS and its minisign signature before they're built."
           } >> notes.md
 
-      - name: Build provenance attestation
-        if: steps.version.outputs.new == 'true'
+      - name: Build provenance attestation (public repositories only)
+        if: steps.version.outputs.new == 'true' && github.event.repository.visibility == 'public'
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: dist/*

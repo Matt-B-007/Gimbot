@@ -17,9 +17,12 @@ The **Publish** job (`.github/workflows/publish.yml`) then, for the version in
 1. runs every check (`scripts/check.sh`);
 2. makes `Gimbot-<version>-source.tar.gz` (and a `.zip`), `SHA256SUMS`, and
    `SHA256SUMS.minisig` signed with the **primary** key from the repository
-   secret `MINISIGN_SECRET_KEY`, and verifies them;
+   secret `MINISIGN_SECRET_KEY`, and verifies the signature against **both**
+   public keys embedded in `install.sh` (either may match); if signing says
+   "Error while loading the secret key file", the secret's contents are
+   wrong: paste the key file into it again;
 3. creates a **draft** release with those files and the version's notes from
-   `CHANGELOG.md`, adds a build provenance attestation, checks every file is
+   `CHANGELOG.md`, adds a build provenance attestation (public repositories only), checks every file is
    attached, then publishes it (a pre-release if the version is a beta).
 
 If anything fails, nothing is published, and a draft left behind is deleted
@@ -44,8 +47,18 @@ runs exactly what CI runs, in the same order: shell scripts (`bash -n` +
 shellcheck at every severity), workflow files (actionlint), web addresses,
 version numbers agreeing, the build, unit and controller tests,
 `gimbot --self-test`, the installer's self-test, and loading every screen.
-Run it before every zip. CI pins shellcheck 0.11.0 and actionlint 1.7.12
-(`pip install shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25`).
+The tests include theme contrast (every text color 4.5:1 in both themes),
+tray icon states and report redaction. Run it before every zip; StowLock runs
+it before pushing.
+
+It first checks for every tool it needs and, if any are missing, lists them
+with the `sudo pacman -S --needed …` command and exits with code **3**
+without checking anything. A failed check exits with **1**, a pass with
+**0**. Colors appear only in a terminal, and never when `NO_COLOR` is set.
+
+CI pins shellcheck 0.11.0 and actionlint 1.7.12
+(`pip install shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25`). Other
+versions on your PC only print a note.
 
 ### Version numbers
 

@@ -10,30 +10,64 @@
 #   GIMBOT_MIN_QT    oldest Qt to accept (default 6.8)
 #   BUILD_DIR        where to build (default build-check)
 #
-# Tools: cmake, a C++ compiler, Qt 6, shellcheck and actionlint. The versions
-# CI uses are pinned below; `pip install shellcheck-py==… actionlint-py==…`
-# installs the same ones.
+# Exit codes: 0 every check passed, 1 a check failed, 3 only tools are
+# missing (nothing was checked; the list says what to install).
+#
+# Colors only when the output is a terminal and NO_COLOR isn't set.
 
 set -euo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-SHELLCHECK_PIN="0.11.0"     # pip: shellcheck-py==0.11.0.1
-ACTIONLINT_PIN="1.7.12"     # pip: actionlint-py==1.7.12.25
+SHELLCHECK_PIN="0.11.0"     # CI: pip install shellcheck-py==0.11.0.1
+ACTIONLINT_PIN="1.7.12"     # CI: pip install actionlint-py==1.7.12.25
 BUILD_DIR="${BUILD_DIR:-build-check}"
 
-step() { printf '\n==> %s\n' "$*"; }
-fail() { printf '\nFAILED: %s\n' "$*" >&2; exit 1; }
-need() { command -v "$1" >/dev/null || fail "$1 isn't installed ($2)"; }
+if [[ -t 1 && -z "${NO_COLOR+x}" ]]; then
+    bold=$'\e[1m' red=$'\e[1;31m' green=$'\e[1;32m' off=$'\e[0m'
+else
+    bold="" red="" green="" off=""
+fi
+step() { printf '\n%s==> %s%s\n' "$bold" "$*" "$off"; }
+fail() { printf '\n%sFAILED: %s%s\n' "$red" "$*" "$off" >&2; exit 1; }
 
-step "Tool versions"
-need shellcheck "pip install shellcheck-py==0.11.0.1"
-need actionlint "pip install actionlint-py==1.7.12.25"
-need cmake "pacman -S cmake"
+step "Required tools"
+missing=()   # "what (arch package)"
+packages=()
+want() { # want <description> <arch package> <found?>
+    if [[ "$3" != yes ]]; then missing+=("$1"); packages+=("$2"); fi
+}
+has() { if command -v "$1" >/dev/null 2>&1; then echo yes; else echo no; fi; }
+want "cmake" cmake "$(has cmake)"
+want "make" make "$(has make)"
+want "a C++ compiler (c++)" gcc "$(has c++)"
+want "shellcheck" shellcheck "$(has shellcheck)"
+want "actionlint" actionlint "$(has actionlint)"
+want "awk" gawk "$(has awk)"
+qtpaths=""
+for q in qtpaths6 /usr/lib/qt6/bin/qtpaths6 /usr/lib/qt6/bin/qtpaths; do
+    if command -v "$q" >/dev/null 2>&1; then qtpaths="$q"; break; fi
+done
+want "Qt 6 (qtpaths6)" qt6-base "$([[ -n "$qtpaths" ]] && echo yes || echo no)"
+if [[ -n "$qtpaths" ]]; then
+    qml="$("$qtpaths" --query QT_INSTALL_QML)"
+    libs="$("$qtpaths" --query QT_INSTALL_LIBS)"
+    want "Qt Quick" qt6-declarative "$([[ -d "$qml/QtQuick" ]] && echo yes || echo no)"
+    want "Qt Multimedia" qt6-multimedia "$([[ -d "$qml/QtMultimedia" ]] && echo yes || echo no)"
+    svg=no
+    for f in "$libs"/libQt6Svg.so*; do if [[ -e "$f" ]]; then svg=yes; fi; done
+    want "Qt SVG" qt6-svg "$svg"
+fi
+if (( ${#missing[@]} > 0 )); then
+    printf '%sMissing tools, so nothing was checked:%s\n' "$red" "$off" >&2
+    printf '  - %s\n' "${missing[@]}" >&2
+    printf '\nInstall them with:\n  sudo pacman -S --needed %s\n' "${packages[*]}" >&2
+    exit 3
+fi
 sc_ver="$(shellcheck --version | sed -n 's/^version: //p')"
 al_ver="$(actionlint --version | head -n1)"
 echo "shellcheck $sc_ver (CI: $SHELLCHECK_PIN), actionlint $al_ver (CI: $ACTIONLINT_PIN), $(cmake --version | head -n1)"
 if [[ "$sc_ver" != "$SHELLCHECK_PIN" || "$al_ver" != "$ACTIONLINT_PIN" ]]; then
-    echo "Note: a different tool version than CI may report different findings."
+    echo "Note: these aren't the versions CI uses, so findings may differ slightly. That's fine on your PC."
 fi
 
 step "Check shell scripts (bash -n + shellcheck -s bash, all severities)"
@@ -94,4 +128,4 @@ shots="$(find "$BUILD_DIR/shots" -name '*.png' | wc -l)"
 (( shots >= 20 )) || fail "only $shots screenshots were saved"
 echo "$shots screens"
 
-step "All checks passed"
+printf '\n%s==> All checks passed%s\n' "$green" "$off"

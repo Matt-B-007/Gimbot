@@ -3,6 +3,28 @@
 What changed in each version of Gimbot. The newest is at the top; the app
 shows a version's notes in its update window.
 
+## 0.1.0-beta.11 (2026-11-27)
+The family look, clearer reports, and a stricter release check. This is the
+first update your installed Gimbot checks before installing.
+- **Tray icon shows what's going on:** plain when the camera is idle, lit in
+  the accent while tracking, a red badge when it's asleep or tracking is
+  paused, an amber dot when an update is ready, a red dot after a camera
+  error, and grey with no camera. Hover for the reason.
+- **Reports:** Save to file, Copy report and Open log folder are the main
+  buttons. Open on GitHub now warns that the issue is public, puts only your
+  summary and the first lines of the details in it, and saves the full report
+  for you to attach.
+- **More private reports:** IP and MAC addresses, tokens and passwords are
+  hidden too (shown as `<ip>`, `<mac>`, `<secret>`), as well as your home
+  folder, user name and computer name (`<host>`). Version numbers stay.
+- **After an update** Gimbot says so once, with What's new and the tour.
+- **Easier to read:** faint text, and success and warning colors in the light
+  theme, are darker so all text passes 4.5:1 contrast; a test checks every
+  color in both themes.
+- **Releases:** the signature is checked against both public keys before
+  anything is published, and `scripts/check.sh` lists any missing tools with
+  the `pacman` command to install them (exit code 3).
+
 ## 0.1.0-beta.10 (2026-11-26)
 Safer updates and better crash reports. This is the first signed release.
 - **Updates are verified.** Each release carries SHA256SUMS and a minisign

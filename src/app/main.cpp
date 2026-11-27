@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         engine.rootObjects().first()->setProperty("screenshotMode", true);
         const QStringList steps = {"studio",  "more", "settings", "settings:image", "settings:motion", "settings:app",
-                                   "settings:device", "palette", "report", "about", "connect", "tour",
+                                   "settings:device", "palette", "report", "report-github", "about", "connect", "tour",
                                    "directions", "uninstall", "shortcuts", "studio-dark", "settings:voice-dark",
                                    "settings:area-dark", "report-dark", "connect-dark", "update", "updating",
                                    "updated", "update-error", "small", "small-dark"};

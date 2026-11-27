@@ -6,6 +6,10 @@
 #include "controller.hpp"
 #include "crashlog.hpp"
 #include "logger.hpp"
+#include "trayicon.hpp"
+#include "redact.hpp"
+#include <QDateTime>
+#include <QSaveFile>
 #include "updater.hpp"
 
 #include <QAction>
@@ -23,6 +27,8 @@
 #include <QStandardPaths>
 #include <QSysInfo>
 #include <QSystemTrayIcon>
+#include <QTimer>
+#include <QPalette>
 #include <QUrl>
 #include <QUrlQuery>
 
@@ -74,6 +80,14 @@ bool Platform::kdeIntegration() const
 #endif
 }
 QString Platform::repoUrl() const { return m_repo.isEmpty() ? QString() : "https://github.com/" + m_repo; }
+bool Platform::repoPublic() const
+{
+#ifdef GIMBOT_REPO_PRIVATE
+    return false;
+#else
+    return true;
+#endif
+}
 QString Platform::logFile() const { return Logger::logFile(); }
 
 // ---------------------------------------------------------------- OBSBOT SDK folder
@@ -257,6 +271,77 @@ void Platform::setupTray()
     m_tray = icon;
     m_trayAvailable = true;
 #endif
+    // Keep the icon's state up to date.
+    auto *problemTimer = new QTimer(this);
+    problemTimer->setSingleShot(true);
+    problemTimer->setInterval(60 * 1000);
+    connect(problemTimer, &QTimer::timeout, this, [this] { m_problem = false; updateTrayState(); });
+    connect(m_cam, &Controller::errorOccurred, this, [this, problemTimer] {
+        m_problem = true;
+        problemTimer->start();
+        updateTrayState();
+    });
+    connect(this, &Platform::showRequested, this, [this, problemTimer] {
+        // Opening the window is how the user sees the error, so clear the dot.
+        if (!m_problem) return;
+        m_problem = false;
+        problemTimer->stop();
+        updateTrayState();
+    });
+    connect(m_cam, &Controller::connectedChanged, this, &Platform::updateTrayState);
+    connect(m_cam, &Controller::valuesChanged, this, &Platform::updateTrayState);
+    connect(m_cam, &Controller::trackingPausedChanged, this, &Platform::updateTrayState);
+    connect(m_updater, &Updater::changed, this, &Platform::updateTrayState);
+    qApp->installEventFilter(this); // redraw when the panel's colors change
+    updateTrayState();
+    emit trayChanged();
+}
+
+bool Platform::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == qApp && event->type() == QEvent::ApplicationPaletteChange) {
+        m_trayState.clear();
+        updateTrayState();
+    }
+    return QObject::eventFilter(watched, event);
+}
+
+void Platform::updateTrayState()
+{
+    if (!m_tray) return;
+    trayicon::Inputs in;
+    in.connected = m_cam->connected();
+    in.problem = m_problem;
+    const auto v = m_cam->values();
+    in.muted = v.value("asleep").toBool() || m_cam->trackingPaused();
+    in.updateReady = m_updater->state() == QLatin1String("available");
+    in.tracking = v.value("mode").toInt() != 0;
+    const auto state = trayicon::stateFor(in);
+    const QString name = trayicon::name(state);
+    if (name == m_trayState) return;
+    m_trayState = name;
+
+    const QColor plain = QGuiApplication::palette().color(QPalette::WindowText);
+    QIcon icon;
+    for (int size : {16, 22, 24, 32, 48, 64}) icon.addPixmap(QPixmap::fromImage(trayicon::render(state, plain, size)));
+    const QString tip = trayicon::tooltip(state);
+#ifdef GIMBOT_HAVE_KF6
+    auto *sni = static_cast<KStatusNotifierItem *>(m_tray);
+    if (state == trayicon::State::Idle) {
+        sni->setIconByName(QStringLiteral("gimbot-symbolic")); // follows the Plasma theme exactly
+    } else {
+        sni->setIconByPixmap(icon);
+    }
+    sni->setToolTip(QStringLiteral("gimbot-symbolic"), QStringLiteral("Gimbot"), tip);
+    // Plasma hides Passive items in the overflow; anything needing a look is NeedsAttention.
+    sni->setStatus(state == trayicon::State::Problem || state == trayicon::State::Attention
+                       ? KStatusNotifierItem::NeedsAttention
+                       : KStatusNotifierItem::Active);
+#else
+    auto *tray = static_cast<QSystemTrayIcon *>(m_tray);
+    tray->setIcon(icon);
+    tray->setToolTip(QStringLiteral("Gimbot: ") + tip);
+#endif
     emit trayChanged();
 }
 
@@ -364,18 +449,56 @@ QString Platform::diagnostics(bool includeSerial) const
     }
     out << QString() << QStringLiteral("Recent log:");
     out << Logger::recent(80);
-    QString text = out.join('\n');
-    // Privacy: no home folder, user name or computer name in reports, and
-    // the serial number only when the user ticks the box.
-    const QString home = QDir::homePath();
-    if (home.size() > 1) text.replace(home, QStringLiteral("~"));
-    const QString user = qEnvironmentVariable("USER");
-    if (user.size() > 2) text.replace(QRegularExpression("\\b" + QRegularExpression::escape(user) + "\\b"), "<user>");
-    const QString host = QSysInfo::machineHostName();
-    if (host.size() > 2) text.replace(host, QStringLiteral("<computer>"));
-    const QString serial = m_cam->serial();
-    if (!includeSerial && serial.size() > 3) text.replace(serial, QStringLiteral("<serial>"));
-    return text;
+    return redactText(out.join('\n'), includeSerial);
+}
+
+QString Platform::redactText(const QString &text, bool includeSerial) const
+{
+    // Privacy: no home folder, user or computer name, addresses or secrets in
+    // reports, and the serial number only when the user ticks the box.
+    redact::Context ctx;
+    ctx.home = QDir::homePath();
+    ctx.user = qEnvironmentVariable("USER");
+    ctx.host = QSysInfo::machineHostName();
+    if (!includeSerial) ctx.extra.append({m_cam->serial(), QStringLiteral("<serial>")});
+    return redact::apply(text, ctx);
+}
+
+QString Platform::reportText(const QString &title, const QString &description, bool includeSerial) const
+{
+    QStringList out;
+    out << QStringLiteral("Summary: %1").arg(title.trimmed().isEmpty() ? QStringLiteral("(none)") : title.trimmed());
+    out << QStringLiteral("What happened:") << (description.trimmed().isEmpty() ? QStringLiteral("(not described)") : description.trimmed());
+    out << QString() << diagnostics(includeSerial);
+    return redactText(out.join('\n'), includeSerial);
+}
+
+QString Platform::saveReport(const QString &title, const QString &description, bool includeSerial)
+{
+    QString dir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+    if (dir.isEmpty() || !QDir().mkpath(dir)) dir = QDir::homePath();
+    const QString path = dir + QStringLiteral("/gimbot-report-%1.txt")
+                                   .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
+    QSaveFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        emit error(tr("Couldn't save the report to %1").arg(dir));
+        return {};
+    }
+    f.write(reportText(title, description, includeSerial).toUtf8());
+    f.write("\n");
+    if (!f.commit()) {
+        emit error(tr("Couldn't save the report to %1").arg(dir));
+        return {};
+    }
+    m_lastReport = path;
+    emit reportSaved();
+    return path;
+}
+
+void Platform::showSavedReport()
+{
+    if (m_lastReport.isEmpty()) return;
+    QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(m_lastReport).path()));
 }
 
 void Platform::copyToClipboard(const QString &text) { QGuiApplication::clipboard()->setText(text); }
@@ -383,14 +506,23 @@ void Platform::copyToClipboard(const QString &text) { QGuiApplication::clipboard
 bool Platform::openIssue(const QString &title, const QString &description, bool includeSerial)
 {
     if (m_repo.isEmpty()) return false;
-    QString body = QStringLiteral("### What happened?\n%1\n\n### Details\n```\n%2\n```\n")
-                       .arg(description.trimmed().isEmpty() ? QStringLiteral("(describe the problem)") : description,
-                            diagnostics(includeSerial));
-    // Browsers and GitHub limit URL length; keep the newest part of the log.
-    if (body.size() > 6000) body = body.left(5990) + "\n```\n";
+    // The issue gets the summary and the header lines only (versions, system,
+    // camera). The full report, with the log, is a file the user attaches.
+    if (saveReport(title, description, includeSerial).isEmpty()) return false;
+    QStringList header;
+    for (const QString &line : diagnostics(includeSerial).split('\n')) {
+        if (line.isEmpty()) break; // the header ends at the first blank line
+        header << line;
+    }
+    const QString body =
+        QStringLiteral("### What happened?\n%1\n\n### Details\n```\n%2\n```\n\n"
+                       "### Full report\nPlease attach `%3` (saved in %4) by dragging it into this box.\n")
+            .arg(description.trimmed().isEmpty() ? QStringLiteral("(describe the problem)") : redactText(description.trimmed(), includeSerial),
+                 header.join('\n'), QFileInfo(m_lastReport).fileName(),
+                 redactText(QFileInfo(m_lastReport).path(), false));
     QUrl url(QStringLiteral("https://github.com/%1/issues/new").arg(m_repo));
     QUrlQuery q;
-    q.addQueryItem("title", title.trimmed().isEmpty() ? QStringLiteral("Problem report") : title.trimmed());
+    q.addQueryItem("title", title.trimmed().isEmpty() ? QStringLiteral("Problem report") : redactText(title.trimmed(), includeSerial));
     q.addQueryItem("body", body);
     url.setQuery(q);
     return QDesktopServices::openUrl(url);
