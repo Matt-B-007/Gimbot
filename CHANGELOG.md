@@ -3,6 +3,19 @@
 What changed in each version of Gimbot. The newest is at the top; the app
 shows a version's notes in its update window.
 
+## 0.1.0-beta.14 (2026-11-27)
+Beta.13 again, with the last QML lint warnings fixed so it passes GitHub's
+checks and arrives as a signed update. Nothing for you to notice.
+- **Seven status dots, dividers and the dialog icon** now give their size as
+  a size hint (`implicitWidth`/`implicitHeight`) instead of setting `width`
+  and `height` inside a layout, which Qt calls undefined behaviour. They
+  look exactly the same.
+- **The checks can't miss this again:** some copies of qmllint come without
+  Qt Quick's own rules, and then those rules silently don't run. `check.sh`
+  now says when that's the case (and fails in CI), and checks the layout
+  rule itself as well (`tests/check_qml_layouts.py`), so it runs everywhere.
+- Beta.13 failed those checks, so it was never signed; your Gimbot skips it.
+
 ## 0.1.0-beta.13 (2026-11-27)
 A tidy-up of the code with nothing for you to notice, plus a fix that lets
 updates arrive again.

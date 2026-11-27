@@ -47,8 +47,8 @@ Popup {
             Layout.fillWidth: true
             Rectangle {
                 visible: root.iconName.length > 0
-                width: 36
-                height: 36
+                implicitWidth: 36
+                implicitHeight: 36
                 radius: 10
                 color: Theme.accentSoft
                 Icon { anchors.centerIn: parent; name: root.iconName; color: Theme.accentText; size: 18 }

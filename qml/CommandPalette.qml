@@ -63,7 +63,7 @@ Popup {
             }
             Kbd { text: "Esc"; Layout.rightMargin: 10 }
         }
-        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border }
         ListView {
             id: list
             Layout.fillWidth: true

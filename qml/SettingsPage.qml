@@ -80,7 +80,7 @@ Rectangle {
                     id: deviceChip
                     anchors.centerIn: parent
                     spacing: 8
-                    Rectangle { width: 8; height: 8; radius: 4; color: root.connected ? Theme.success : Theme.textFaint }
+                    Rectangle { implicitWidth: 8; implicitHeight: 8; radius: 4; color: root.connected ? Theme.success : Theme.textFaint }
                     Text {
                         text: root.connected ? qsTr("%1 · detected automatically").arg(cam.model) : qsTr("No camera connected")
                         color: Theme.text
@@ -90,7 +90,7 @@ Rectangle {
                 }
             }
         }
-        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border }
 
         RowLayout {
             Layout.fillWidth: true

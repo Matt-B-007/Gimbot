@@ -45,7 +45,7 @@ RowLayout {
             anchors.centerIn: parent
             spacing: 8
             Rectangle {
-                width: 8; height: 8; radius: 4
+                implicitWidth: 8; implicitHeight: 8; radius: 4
                 color: !cam.connected ? Theme.textFaint : cam.values.asleep ? Theme.warning : Theme.success
             }
             Text {

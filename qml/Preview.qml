@@ -454,7 +454,7 @@ Rectangle {
             id: chipRow
             anchors.centerIn: parent
             spacing: 8
-            Rectangle { visible: chip.showDot; width: 8; height: 8; radius: 4; color: chip.dotColor }
+            Rectangle { visible: chip.showDot; implicitWidth: 8; implicitHeight: 8; radius: 4; color: chip.dotColor }
             Text { id: label; color: "#e8edf4"; font.family: Theme.font; font.pixelSize: Theme.small; font.weight: Font.Medium }
         }
     }

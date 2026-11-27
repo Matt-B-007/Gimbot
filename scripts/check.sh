@@ -47,6 +47,7 @@ want "shellcheck" shellcheck "$(has shellcheck)"
 want "actionlint" actionlint "$(has actionlint)"
 want "awk" gawk "$(has awk)"
 want "clang-format" clang "$(has clang-format)"
+want "python3" python "$(has python3)"
 qtpaths=""
 for q in qtpaths6 /usr/lib/qt6/bin/qtpaths6 /usr/lib/qt6/bin/qtpaths; do
     if command -v "$q" >/dev/null 2>&1; then qtpaths="$q"; break; fi
@@ -160,10 +161,24 @@ if [[ -f "$BUILD_DIR/Gimbot/gimbot.qmltypes" ]]; then
 fi
 cp .qmllint.ini "$lint_dir/"
 qml_files=("$lint_dir"/Gimbot/*.qml)
+# Qt Quick's own rules (e.g. Quick.layout-positioning) live in a qmllint
+# plugin. Arch's qmllint has it; some copies (PySide6's) don't, and then
+# those rules would silently not run. CI must have it.
+if "$qmllint" --list-plugins 2>/dev/null | grep -qi "quick"; then
+    echo "qmllint has the Qt Quick plugin"
+elif [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+    fail "this qmllint has no Qt Quick plugin, so Qt Quick's rules wouldn't be checked"
+else
+    echo "Note: this qmllint has no Qt Quick plugin; CI's does. The layout rule is still checked below."
+fi
 if ! (cd "$lint_dir" && "$qmllint" -I "$lint_dir" "${qml_files[@]}"); then
     fail "qmllint found problems (files are copies in $lint_dir/Gimbot; fix them in qml/)"
 fi
 echo "${#qml_files[@]} QML files lint clean"
+# The layout rule from that plugin, checked by our own script too, so it
+# runs everywhere (see tests/check_qml_layouts.py).
+python3 tests/check_qml_layouts.py qml/*.qml || fail "items inside layouts set their own size or position"
+echo "no item inside a layout sets its own size or position"
 
 step "Unit and controller tests (ctest)"
 QT_QPA_PLATFORM=offscreen ctest --test-dir "$BUILD_DIR" --output-on-failure || fail "ctest"

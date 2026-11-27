@@ -60,7 +60,7 @@ Rectangle {
         anchors.leftMargin: 14
         anchors.rightMargin: 6
         spacing: 10
-        Rectangle { width: 8; height: 8; radius: 4; color: root.toneColor }
+        Rectangle { implicitWidth: 8; implicitHeight: 8; radius: 4; color: root.toneColor }
         Text {
             text: root.current.text
             color: Theme.text
