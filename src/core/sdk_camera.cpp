@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Real camera implementation on top of OBSBOT's libdev SDK.
 #include "camera.hpp"
 

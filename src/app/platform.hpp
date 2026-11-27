@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Desktop integration: tray icon, system-wide shortcuts, autostart, crash
 // detection, bug reports and the D-Bus interface used by gimbotctl.
 // Uses KDE Frameworks when they were found at build time (GIMBOT_HAVE_KF6),
@@ -22,6 +23,8 @@ class Platform : public QObject {
     Q_PROPERTY(QString qtVersion READ qtVersion CONSTANT)
     Q_PROPERTY(QString system READ system CONSTANT)
     Q_PROPERTY(bool kdeIntegration READ kdeIntegration CONSTANT)
+    // Plasma's "Animation speed" set to instant (reduced motion).
+    Q_PROPERTY(bool reduceMotion READ reduceMotion CONSTANT)
     Q_PROPERTY(bool trayAvailable READ trayAvailable NOTIFY trayChanged)
     Q_PROPERTY(QString trayState READ trayState NOTIFY trayChanged)
     Q_PROPERTY(bool issuesConfigured READ issuesConfigured CONSTANT)
@@ -46,6 +49,10 @@ public:
     QString system() const;
     bool kdeIntegration() const;
     bool trayAvailable() const { return m_trayAvailable; }
+    bool reduceMotion() const;
+    // For `gimbot --report` without a running copy: use the log file, which
+    // has the earlier sessions, instead of this run's lines.
+    void setReportFromFile(bool on) { m_reportFromFile = on; }
     QString trayState() const { return m_trayState; }
     bool issuesConfigured() const { return !m_repo.isEmpty(); }
     QString lastReport() const { return m_lastReport; }
@@ -124,6 +131,7 @@ private:
     bool m_problem = false; // the camera reported an error in the last minute
     QString m_trayState;
     QString m_lastReport;
+    bool m_reportFromFile = false;
     QString m_newSdkPath, m_newSdkVersion;
 };
 
@@ -137,6 +145,7 @@ public:
 public slots:
     Q_SCRIPTABLE void Activate();
     Q_SCRIPTABLE int Run(const QStringList &args, QString &output);
+    Q_SCRIPTABLE QString SaveReport();
 
 private:
     Controller *m_cam;

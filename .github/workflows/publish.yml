@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Publishes Gimbot automatically whenever files arrive on main.
 #
 # 1. If a Gimbot zip was uploaded to the top of the repository, unpack it over
@@ -36,7 +37,7 @@ jobs:
             minisign github-cli unzip zip
           pip install --break-system-packages shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -180,7 +181,7 @@ jobs:
 
       - name: Build provenance attestation (public repositories only)
         if: steps.version.outputs.new == 'true' && github.event.repository.visibility == 'public'
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/*
 

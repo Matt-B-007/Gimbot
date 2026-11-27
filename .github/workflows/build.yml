@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Checks Gimbot on Arch Linux (the base CachyOS uses) for every push and pull
 # request. All checks live in scripts/check.sh, so a local run and this one
 # are the same. OBSBOT's SDK isn't public, so CI builds the simulated camera.
@@ -21,12 +22,12 @@ jobs:
             qt6-base qt6-declarative qt6-multimedia qt6-multimedia-ffmpeg qt6-svg \
             kcoreaddons kcrash kglobalaccel kstatusnotifieritem
           pip install --break-system-packages shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Run every check (bash scripts/check.sh)
         run: bash scripts/check.sh
       - name: Keep the screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: screenshots
           path: build-check/shots/

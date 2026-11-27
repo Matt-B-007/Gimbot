@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // An in-memory Tiny 2 for tests and for working on the UI without hardware.
 // It remembers everything it is told and reports it back like the real
 // camera does, including a gimbal that moves at the requested speed.

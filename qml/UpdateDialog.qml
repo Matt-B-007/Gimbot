@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -186,6 +187,7 @@ Sheet {
             text: updater.installState === "failed" ? qsTr("Try again") : updater.isSwitch ? qsTr("Switch now") : qsTr("Update now")
             iconName: "download"
             variant: "primary"
+            glow: true // the screen's one main action
             onClicked: root.rebuilding ? updater.rebuild() : updater.install()
         },
         Btn {
@@ -193,6 +195,7 @@ Sheet {
             text: qsTr("Restart Gimbot")
             iconName: "refresh"
             variant: "primary"
+            glow: true // the screen's one main action
             onClicked: updater.restartApp()
         }
     ]

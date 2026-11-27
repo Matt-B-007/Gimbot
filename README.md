@@ -6,6 +6,11 @@ A modern Linux app for controlling the OBSBOT Tiny 2 camera, made for KDE
 Plasma on CachyOS and other Arch-based systems. **Unofficial; not affiliated
 with OBSBOT or Remo Tech.**
 
+<p align="center">
+  <img src="docs/screenshots/studio-dark.png" width="49%" alt="Gimbot's main window in the dark theme: the camera preview with tracking modes, and the Tracking card">
+  <img src="docs/screenshots/studio-light.png" width="49%" alt="The same window in the light theme">
+</p>
+
 ## Install
 
 1. **Get the OBSBOT SDK.** Apply at <https://obsbot.com/sdk>; OBSBOT emails you
@@ -58,6 +63,37 @@ curl -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh |
 Camera firmware updates aren't possible from Linux (OBSBOT's SDK doesn't
 offer them); use OBSBOT Center on Windows or macOS for those.
 
+## Command line
+
+| Command | What it does |
+|---|---|
+| `gimbot --version` | Shows the version |
+| `gimbot --self-test` | Checks that everything works (`--quick` for the short check) |
+| `gimbot --report` | Saves a problem report to Downloads, personal details hidden |
+| `gimbot --update` | Installs the newest version for your update channel |
+| `gimbot --rollback` | Goes back to the version you had before the last update |
+| `gimbot --uninstall` | Removes Gimbot (asks about your settings) |
+| `gimbot --hidden` | Starts in the tray |
+
+The installer takes `--beta`, `--version TAG`, `--uninstall`, `--no-launch`
+and `--from-source` (not verified), for example
+`curl -fsSL …/install.sh | sh -s -- --beta`.
+
+## Privacy
+
+Gimbot never collects or sends:
+
+- usage statistics, analytics or crash reports (nothing is sent automatically)
+- your camera's picture or sound (the preview stays on your computer)
+- your camera's serial number, unless you tick the box in a report
+- an account or sign-in: there isn't one
+
+It only connects to GitHub to check for and download updates (you can turn
+the daily check off in **Settings › App**), to public DNS (1.1.1.1, 8.8.8.8)
+if your own DNS can't find GitHub, and to the camera (the OBSBOT SDK also
+looks for cameras on your local network). Reports are saved on your computer
+and go nowhere until you attach them to an issue yourself.
+
 ## Problems?
 
 - **In the app:** **Help (?) › Report a problem** saves the details to a file
@@ -93,7 +129,10 @@ pacman package.
 `gimbot --self-test` checks that everything works (`--quick` for the short
 version).
 
-Building by hand, `gimbotctl`, releasing and testing: see [BUILDING.md](BUILDING.md).
+Building by hand, `gimbotctl` and testing: [BUILDING.md](BUILDING.md).
+Publishing versions: [RELEASING.md](RELEASING.md). Helping out:
+[CONTRIBUTING.md](CONTRIBUTING.md). Getting help: [SUPPORT.md](SUPPORT.md).
+Security problems: [SECURITY.md](SECURITY.md).
 What changed in each version: [CHANGELOG.md](CHANGELOG.md).
 
 ## License

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Settings file housekeeping: a version number with migrations, and rolling
 // backups. Qt writes the file itself with a temporary file and a rename.
 #pragma once

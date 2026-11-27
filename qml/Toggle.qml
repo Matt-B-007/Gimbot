@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Controls
 
@@ -23,7 +24,7 @@ Switch {
         width: 44
         height: 26
         radius: 13
-        color: control.checked ? Theme.accent : (Theme.dark ? "#2c3035" : "#cfd3d9")
+        color: control.checked ? Theme.accent : (Theme.dark ? "#2a3444" : "#cdd5df")
         opacity: control.enabled ? 1 : 0.45
         Behavior on color { ColorAnimation { duration: Theme.normal } }
         Rectangle {
@@ -32,7 +33,7 @@ Switch {
             width: 20
             height: 20
             radius: 10
-            color: control.checked ? Theme.accentInk : (Theme.dark ? "#c9ccd1" : "#ffffff")
+            color: control.checked ? Theme.accentInk : (Theme.dark ? "#d5dce6" : "#ffffff")
             Behavior on x { NumberAnimation { duration: Theme.normal; easing.type: Easing.OutCubic } }
         }
         Rectangle {

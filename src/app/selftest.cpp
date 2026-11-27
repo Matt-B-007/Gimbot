@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "selftest.hpp"
 
 #include "commands.hpp"

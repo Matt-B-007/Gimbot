@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // gimbot --self-test [--quick]
 //
 // --quick: can the program start, load its interface and read the settings?

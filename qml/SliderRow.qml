@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -58,7 +59,7 @@ ColumnLayout {
             width: slider.availableWidth
             height: 4
             radius: 2
-            color: Theme.dark ? "#2c3035" : "#d5d9de"
+            color: Theme.dark ? "#2a3444" : "#cdd5df"
             Rectangle {
                 width: slider.visualPosition * parent.width
                 height: parent.height
@@ -72,7 +73,7 @@ ColumnLayout {
             width: slider.pressed ? 20 : 18
             height: width
             radius: width / 2
-            color: Theme.dark ? "#f2f3f5" : "#ffffff"
+            color: Theme.dark ? "#e8edf4" : "#ffffff"
             border.width: Theme.dark ? 0 : 1
             border.color: Theme.borderStrong
             Behavior on width { NumberAnimation { duration: Theme.fast } }

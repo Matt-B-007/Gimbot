@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "trayicon.hpp"
 
 #include <QCoreApplication>
@@ -49,7 +50,7 @@ QImage render(State s, const QColor &plain, int size)
     const QColor red(0xda, 0x44, 0x53);
     const QColor amber(0xf6, 0x74, 0x00);
     const bool darkPanel = plain.lightnessF() > 0.5; // light text means a dark panel
-    const QColor accent = darkPanel ? QColor(0x8b, 0x9c, 0xff) : QColor(0x4c, 0x5b, 0xd4);
+    const QColor accent = darkPanel ? QColor(0xc0, 0x84, 0xfc) : QColor(0x7e, 0x22, 0xce); // Gimbot purple
 
     QColor ink = plain;
     if (s == State::Active) ink = accent;

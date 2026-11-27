@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "updater.hpp"
 
 #include <QFile>

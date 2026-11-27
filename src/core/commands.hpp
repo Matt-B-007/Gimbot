@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Text commands shared by gimbotctl and the app's D-Bus interface, so
 // `gimbotctl track person` works the same whether it talks to the camera
 // directly or through the running Gimbot app.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -79,7 +80,7 @@ Rectangle {
                     font.family: Theme.font
                     font.pixelSize: root.pill ? Theme.fontSize - 1 : Theme.small + 1
                     font.weight: btn.selected ? Font.DemiBold : Font.Medium
-                    color: btn.selected ? Theme.accentInk : root.onVideo ? "#f2f3f5" : Theme.text
+                    color: btn.selected ? Theme.accentInk : root.onVideo ? "#e8edf4" : Theme.text
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                     elide: Text.ElideRight

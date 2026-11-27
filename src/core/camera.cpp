@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "camera.hpp"
 
 #include <algorithm>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Checks GitHub for a newer Gimbot and installs it.
 //
 // Checking reads the project's releases: channel 1 follows normal releases,
@@ -74,6 +75,7 @@ public:
     QString installAction() const { return m_action; }
 
     void setChannel(int channel);
+    int channel() const { return m_channel; }
     // A check the user asked for (a button). Automatic checks use autoCheck().
     Q_INVOKABLE void check();
     void autoCheck();

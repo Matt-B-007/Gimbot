@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
 # Fails if the source contains a web address outside the expected hosts, so a
 # mistyped or mirror domain (which once broke updates and the installer)
 # can't slip back in.

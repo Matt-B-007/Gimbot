@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // gimbotctl: command-line control for OBSBOT Tiny 2 cameras (part of Gimbot).
 //
 // If the Gimbot app is running, commands go through it over D-Bus, because

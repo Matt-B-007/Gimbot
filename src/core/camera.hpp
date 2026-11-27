@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Gimbot camera layer.
 //
 // `Camera` is the interface the app talks to. `openSdkCamera()` returns the

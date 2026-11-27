@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Behaviour of the app's controller with the simulated camera: the tracking
 // switch, pausing on manual moves, resume, undo and the active profile.
 #include "controller.hpp"

@@ -3,6 +3,39 @@
 What changed in each version of Gimbot. The newest is at the top; the app
 shows a version's notes in its update window.
 
+## 0.1.0-beta.12 (2026-11-27)
+Gimbot's new colors, shared with the other apps in the family, plus terminal
+commands and the project files that make it easier to help.
+- **Purple, on navy:** the accent changes from indigo to purple, and the
+  backgrounds take the navy "hull" every app in the family now shares, in
+  both themes. Success, warning and error colors match the family too. If
+  you use your KDE accent color, that still wins.
+- **Small family details:** cards have a faint accent edge; the Tracking card
+  shows corner brackets while tracking is on (and any card does while it has
+  keyboard focus); only the main button on a screen glows; a faint dot
+  pattern sits behind the preview when there's no picture. **Settings ›
+  App › Plain background** turns the pattern off, and so does turning
+  animations off in System Settings.
+- **New icon and tray colors:** the launcher icon is a navy square with a
+  purple symbol, and the tray icon lights up purple while tracking.
+- **Easy to read:** every text color passes the family's contrast rules on
+  every surface (a test checks all of them, in both themes).
+- **Terminal commands:** `gimbot --report` saves a problem report,
+  `--update`, `--rollback` and `--uninstall` run the installer (or show the
+  AUR command), and they work over SSH too. The installer adds `--beta` and
+  `--no-launch`; `--selftest` is now `--self-test` (the old name still works).
+- **Reports say how Gimbot was installed** and which update channel you're
+  on, so problems are quicker to sort out.
+- **Project files:** screenshots and a Privacy section in the README, plus
+  CONTRIBUTING, SUPPORT, SECURITY and RELEASING guides, a bug report form,
+  a pull request checklist, and a licence line at the top of every file.
+- **Fixed a rare crash** when many icons changed color at once (for example
+  switching between light and dark): icons are now redrawn fresh when they
+  come into view instead of switching their drawing layer off and on, which
+  could crash Qt's shape drawing.
+- **Stricter checks:** compiler warnings now fail the build, a Release build
+  runs its own self-test, and GitHub's actions are on their current versions.
+
 ## 0.1.0-beta.11 (2026-11-27)
 The family look, clearer reports, and a stricter release check. This is the
 first update your installed Gimbot checks before installing.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Tests that run without a camera: the command interpreter against the fake
 // camera, and the update checker's version comparison.
 #include "camera.hpp"

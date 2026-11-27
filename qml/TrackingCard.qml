@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Layouts
 
@@ -6,6 +7,7 @@ import QtQuick.Layouts
 Card {
     id: root
     title: qsTr("Tracking")
+    active: root.on // corner brackets while tracking
     moreKey: "moreTracking"
     signal openArea()
     signal openVoice()

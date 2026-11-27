@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -102,6 +103,25 @@ Rectangle {
         visible: root.videoRunning
     }
 
+    // A faint dot grid behind the empty preview (the family detail); off with
+    // "Plain background" or when animations are off.
+    Canvas {
+        anchors.fill: parent
+        visible: !root.videoRunning && !cam.values.plainBackground && !platform.reduceMotion
+        opacity: 0.045
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onPaint: {
+            const ctx = getContext("2d")
+            ctx.reset()
+            ctx.fillStyle = "#ffffff"
+            const step = 18
+            for (let y = step / 2; y < height; y += step)
+                for (let x = step / 2; x < width; x += step)
+                    ctx.fillRect(x - 1, y - 1, 2, 2)
+        }
+    }
+
     // Shown when there is no picture.
     ColumnLayout {
         anchors.centerIn: parent
@@ -111,14 +131,14 @@ Rectangle {
         Icon {
             Layout.alignment: Qt.AlignHCenter
             name: root.error.length > 0 ? "alert" : !cam.values.previewEnabled ? "eye-off" : "camera"
-            color: "#6f757d"
+            color: "#6b7a8f"
             size: 28
         }
         Text {
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
-            color: "#c9ccd1"
+            color: "#d5dce6"
             font.family: Theme.font
             font.pixelSize: Theme.fontSize
             font.weight: Font.Medium
@@ -133,7 +153,7 @@ Rectangle {
             visible: root.error.length > 0 || !cam.values.previewEnabled || cam.simulated
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
-            color: "#8a9099"
+            color: "#9aa6b8"
             font.family: Theme.font
             font.pixelSize: Theme.small + 1
             text: root.error.length > 0
@@ -257,7 +277,7 @@ Rectangle {
         visible: !cam.values.asleep
         Chip {
             showDot: true
-            dotColor: cam.values.mode !== 0 ? Theme.accent : cam.trackingPaused ? Theme.warning : "#6f757d"
+            dotColor: cam.values.mode !== 0 ? Theme.accent : cam.trackingPaused ? Theme.warning : "#6b7a8f"
             text: cam.values.mode !== 0
                   ? qsTr("Tracking: %1").arg(["", qsTr("Group"), qsTr("Person"), qsTr("Hand"), qsTr("Whiteboard"), qsTr("Desk")][cam.values.mode] || "")
                   : cam.trackingPaused ? qsTr("Tracking paused") : qsTr("Tracking off")
@@ -299,12 +319,12 @@ Rectangle {
                             id: qText
                             text: root.currentLabel.length === 0 ? qsTr("Auto")
                                 : root.autoQuality ? qsTr("Auto · %1").arg(root.currentLabel) : root.currentLabel
-                            color: "#e6e8eb"
+                            color: "#e8edf4"
                             font.family: Theme.font
                             font.pixelSize: Theme.small
                             font.weight: Font.Medium
                         }
-                        Icon { name: "chevron-down"; size: 12; color: "#c9ccd1" }
+                        Icon { name: "chevron-down"; size: 12; color: "#d5dce6" }
                     }
                 }
                 BarIcon {
@@ -356,11 +376,11 @@ Rectangle {
         ColumnLayout {
             anchors.centerIn: parent
             spacing: 12
-            Icon { Layout.alignment: Qt.AlignHCenter; name: "moon"; size: 30; color: "#9aa0a8"; stroke: 1.8 }
+            Icon { Layout.alignment: Qt.AlignHCenter; name: "moon"; size: 30; color: "#9aa6b8"; stroke: 1.8 }
             Text {
                 Layout.alignment: Qt.AlignHCenter
                 text: qsTr("Camera is asleep")
-                color: "#f2f3f5"
+                color: "#e8edf4"
                 font.family: Theme.font
                 font.pixelSize: Theme.large
                 font.weight: Font.DemiBold
@@ -416,7 +436,7 @@ Rectangle {
             border.width: bi.visualFocus ? 2 : 0
             border.color: Theme.accentText
         }
-        contentItem: Item { Icon { anchors.centerIn: parent; name: bi.iconName; size: 15; color: "#e6e8eb" } }
+        contentItem: Item { Icon { anchors.centerIn: parent; name: bi.iconName; size: 15; color: "#e8edf4" } }
     }
 
     component Chip: Rectangle {
@@ -434,7 +454,7 @@ Rectangle {
             anchors.centerIn: parent
             spacing: 8
             Rectangle { visible: chipRow.parent.showDot; width: 8; height: 8; radius: 4; color: chipRow.parent.dotColor }
-            Text { id: label; color: "#e6e8eb"; font.family: Theme.font; font.pixelSize: Theme.small; font.weight: Font.Medium }
+            Text { id: label; color: "#e8edf4"; font.family: Theme.font; font.pixelSize: Theme.small; font.weight: Font.Medium }
         }
     }
 }

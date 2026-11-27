@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "logger.hpp"
 
 #include <QCoreApplication>
@@ -104,6 +105,19 @@ QStringList recent(int lines)
     const int start = std::max(0, int(g_recent.size()) - lines);
     for (int i = start; i < int(g_recent.size()); ++i) out << g_recent[i];
     return out;
+}
+
+QStringList fileTail(int lines)
+{
+    QStringList all;
+    // The previous file first, in case the current one was just started.
+    for (const QString &path : {logFile() + QStringLiteral(".1"), logFile()}) {
+        QFile f(path);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) continue;
+        f.seek(std::max<qint64>(0, f.size() - 256 * 1024)); // the end is enough
+        all += QString::fromUtf8(f.readAll()).split('\n', Qt::SkipEmptyParts);
+    }
+    return all.mid(std::max<qsizetype>(0, all.size() - lines));
 }
 
 } // namespace Logger

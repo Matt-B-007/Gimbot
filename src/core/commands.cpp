@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "commands.hpp"
 
 #include <cstdarg>

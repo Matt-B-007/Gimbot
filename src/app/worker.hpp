@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Runs SDK calls one at a time on a background thread. The SDK blocks
 // until the camera replies, so nothing here may run on the GUI thread.
 #pragma once

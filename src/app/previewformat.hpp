@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Picks the video format for Gimbot's own preview.
 //
 // The camera offers many resolution and frame-rate combinations. Without a

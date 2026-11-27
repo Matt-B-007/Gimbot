@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -51,7 +52,10 @@ ApplicationWindow {
     function showScreen(name) {
         palette.close(); report.close(); about.close(); shortcutsDialog.close(); tour.close(); directionCheck.close(); uninstallDialog.close()
         if (name !== "updating" && name !== "updated") updateDialog.close()
-        if (name.endsWith("-dark")) { cam.set("theme", 1); name = name.replace("-dark", "") }
+        cam.set("theme", name.endsWith("-dark") ? 1 : name.endsWith("-light") ? 2 : 0) // same result every run
+        if (name.endsWith("-dark")) name = name.replace("-dark", "")
+        if (name.endsWith("-light")) name = name.replace("-light", "")
+        studio.updateDismissed = name === "readme" // the README's pictures: no pretend update
         forceConnectScreen = name === "connect"
         const parts = name.split(":")
         if (parts[0] === "settings") { page = "settings"; settings.scrollTo(parts[1] || "area") }

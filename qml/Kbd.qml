@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 
 // A small key cap, e.g. "Ctrl K".
@@ -13,7 +14,7 @@ Rectangle {
     Text {
         id: label
         anchors.centerIn: parent
-        color: onVideo ? "#d4d7dc" : Theme.textMuted
+        color: onVideo ? "#cdd5df" : Theme.textMuted
         font.family: Theme.font
         font.pixelSize: 11
         font.weight: Font.Medium

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "previewformat.hpp"
 
 #include <algorithm>

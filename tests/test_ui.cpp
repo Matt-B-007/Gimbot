@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Tests for the parts of the desktop app that need Qt GUI: the theme's
 // contrast, the tray icon states and report redaction.
 #include "redact.hpp"
@@ -33,8 +34,10 @@ class UiTest : public QObject
     Q_OBJECT
 
 private slots:
-    // Every text color on every background, in the light and the dark theme,
-    // passes WCAG AA (4.5:1). The light accent is Gimbot's #4c5bd4.
+    // House standard v1.3: every text color on every surface (bg, sidebar,
+    // card, control, hover), in the light and the dark theme, passes WCAG AA
+    // (4.5:1), and so does the text on filled accent buttons (dark ink in the
+    // dark theme, white in the light one). Gimbot's accent is purple.
     void themeContrast()
     {
         QFile f(QStringLiteral(GIMBOT_SOURCE_DIR "/qml/Theme.qml"));
@@ -48,12 +51,20 @@ private slots:
         QVERIFY2(theme, qPrintable(component.errorString()));
 
         const char *texts[] = {"text", "textMuted", "textFaint", "accentText", "danger", "success", "warning", "brand"};
-        const char *backgrounds[] = {"bg", "surface", "surface2", "sunken"};
+        const char *backgrounds[] = {"bg", "sidebar", "surface", "surface2", "hover", "sunken"};
         for (int mode : {1, 2}) { // dark, light
             theme->setProperty("mode", mode);
             theme->setProperty("useSystemAccent", false);
             const QString name = mode == 1 ? QStringLiteral("dark") : QStringLiteral("light");
-            if (mode == 2) QCOMPARE(theme->property("brand").value<QColor>(), QColor("#4c5bd4"));
+            QCOMPARE(theme->property("brand").value<QColor>(), QColor(mode == 1 ? "#c084fc" : "#7e22ce"));
+            QCOMPARE(theme->property("accentInk").value<QColor>(), QColor(mode == 1 ? "#0c1016" : "#ffffff"));
+            QCOMPARE(theme->property("bg").value<QColor>(), QColor(mode == 1 ? "#0c1016" : "#f5f7fa"));
+            // The standard's own minimums on its worst surface.
+            for (const char *bg : backgrounds) {
+                const QColor b = theme->property(bg).value<QColor>();
+                QVERIFY2(contrast(theme->property("text").value<QColor>(), b) >= 12.3, bg);
+                QVERIFY2(contrast(theme->property("textMuted").value<QColor>(), b) >= 5.0, bg);
+            }
             for (const char *fg : texts) {
                 for (const char *bg : backgrounds) {
                     const QColor a = theme->property(fg).value<QColor>();
@@ -65,9 +76,9 @@ private slots:
                                                       .arg(r, 0, 'f', 2)));
                 }
             }
-            // Text on filled accent buttons.
+            // Text on filled accent buttons: 7.2:1 for dark ink, 5.1:1 for white.
             const double ink = contrast(theme->property("accentInk").value<QColor>(), theme->property("accent").value<QColor>());
-            QVERIFY2(ink >= 4.5, qPrintable(QStringLiteral("%1 theme: button text on the accent is %2:1").arg(name).arg(ink, 0, 'f', 2)));
+            QVERIFY2(ink >= (mode == 1 ? 7.2 : 5.1), qPrintable(QStringLiteral("%1 theme: button text on the accent is %2:1").arg(name).arg(ink, 0, 'f', 2)));
         }
     }
 

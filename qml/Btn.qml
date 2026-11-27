@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -61,8 +62,13 @@ Button {
         shortcut: control.shortcut
     }
 
+    // The family glow: only on the one primary action of a screen, and on
+    // whatever has keyboard focus.
+    property bool glow: false
+
     background: Rectangle {
         radius: control.pill ? height / 2 : Theme.radiusSm + 2
+        Glow { radius: parent.radius; on: (control.glow && control.enabled) || control.visualFocus }
         color: {
             if (control.variant === "primary")
                 return control.down ? Qt.darker(Theme.accent, 1.1) : control.hovered ? Qt.lighter(Theme.accent, 1.06) : Theme.accent

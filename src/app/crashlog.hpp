@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Crash traces: when Gimbot crashes, a short file with the signal and a
 // backtrace is written to ~/.local/state/gimbot/crashes (the last 10 kept).
 // The "running" marker (Platform) tells the next start that it happened;

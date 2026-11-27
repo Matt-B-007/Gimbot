@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Layouts
 
@@ -24,10 +25,22 @@ Rectangle {
     property string noteAction: ""
     signal noteActivated()
 
+    // Corner brackets mark the active card (e.g. Tracking while it's on) and
+    // the card holding keyboard focus.
+    property bool active: false
+    readonly property bool focusInside: {
+        const f = root.Window.activeFocusItem
+        if (!f || f.visualFocus !== true) return false
+        for (let i = f; i; i = i.parent) if (i === root) return true
+        return false
+    }
+
     color: Theme.surface
     radius: Theme.radiusLg
     border.width: 1
-    border.color: Theme.border
+    border.color: Theme.cardEdge // the accent at 18%, like the logo's edge
+
+    Brackets { anchors.fill: parent; z: 2; opacity: root.active || root.focusInside ? 1 : 0 }
     implicitHeight: outer.implicitHeight + padding * 2
     implicitWidth: 320
     Accessible.role: Accessible.Grouping

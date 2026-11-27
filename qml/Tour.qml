@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -112,6 +113,7 @@ Popup {
                     Btn {
                         text: root.step < root.steps.length - 1 ? qsTr("Next") : qsTr("Done")
                         variant: "primary"
+            glow: true // the screen's one main action
                         compact: true
                         focus: true
                         onClicked: root.next()

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
 # Every check CI runs, in the same order with the same flags. CI calls this
 # script and nothing else for checks, so a run here and a run on GitHub can't
 # disagree. Run it from anywhere:
@@ -101,8 +102,21 @@ if [[ "$version" == *-* ]]; then
         || fail "packaging/aur/gimbot-beta/PKGBUILD pkgver ($pkgver) doesn't match $version"
 fi
 
-step "Configure and build (cmake, Debug, tests on)"
-cmake_args=(-S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON "-DGIMBOT_MIN_QT=${GIMBOT_MIN_QT:-6.8}")
+step "Licence headers (SPDX-License-Identifier: MIT in every source file)"
+no_spdx=()
+while IFS= read -r -d '' f; do
+    if ! head -n 3 "$f" | grep -q "SPDX-License-Identifier: MIT"; then no_spdx+=("$f"); fi
+done < <(find . \( -path ./.git -o -path "./build*" \) -prune -o -type f \
+    \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' -o -name '*.qml' -o -name '*.sh' -o -name '*.yml' \
+       -o -name '*.cmake' -o -name '*.py' -o -name CMakeLists.txt -o -name PKGBUILD \) -print0)
+if (( ${#no_spdx[@]} > 0 )); then
+    printf '  %s\n' "${no_spdx[@]}" >&2
+    fail "these files need '// SPDX-License-Identifier: MIT' (or '# …') in their first lines"
+fi
+echo "every source file has one"
+
+step "Configure and build (cmake, Debug, tests on, warnings are errors)"
+cmake_args=(-S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DGIMBOT_WERROR=ON "-DGIMBOT_MIN_QT=${GIMBOT_MIN_QT:-6.8}")
 if [[ -n "${OBSBOT_SDK_DIR:-}" ]]; then cmake_args+=("-DOBSBOT_SDK_DIR=$OBSBOT_SDK_DIR"); fi
 cmake "${cmake_args[@]}" >/dev/null || fail "cmake configure"
 cmake --build "$BUILD_DIR" -j"$(nproc)" || fail "build"
@@ -113,14 +127,28 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir "$BUILD_DIR" --output-on-failure || f
 step "Self-test (gimbot --self-test)"
 QT_QPA_PLATFORM=offscreen "$BUILD_DIR/gimbot" --self-test || fail "gimbot --self-test"
 
-step "Installer self-test (install.sh --selftest)"
-bash install.sh --selftest || fail "install.sh --selftest"
+step "Release build and its self-test (cmake Release, gimbot --self-test)"
+release_args=(-S . -B "$BUILD_DIR-release" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DGIMBOT_WERROR=ON "-DGIMBOT_MIN_QT=${GIMBOT_MIN_QT:-6.8}")
+if [[ -n "${OBSBOT_SDK_DIR:-}" ]]; then release_args+=("-DOBSBOT_SDK_DIR=$OBSBOT_SDK_DIR"); fi
+cmake "${release_args[@]}" >/dev/null || fail "cmake configure (Release)"
+cmake --build "$BUILD_DIR-release" -j"$(nproc)" || fail "build (Release)"
+QT_QPA_PLATFORM=offscreen "$BUILD_DIR-release/gimbot" --self-test || fail "gimbot --self-test (Release build)"
+
+step "Installer self-test (install.sh --self-test)"
+bash install.sh --self-test || fail "install.sh --self-test"
 
 step "Screens load without QML errors (gimbot --fake --screenshots)"
 rm -rf "$BUILD_DIR/shots"
+shots_rc=0
 QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
-    "$BUILD_DIR/gimbot" --fake --screenshots "$BUILD_DIR/shots" >"$BUILD_DIR/screens.log" 2>&1 \
-    || fail "the screenshot run exited with an error (see $BUILD_DIR/screens.log)"
+    "$BUILD_DIR/gimbot" --fake --screenshots "$BUILD_DIR/shots" >"$BUILD_DIR/screens.log" 2>&1 || shots_rc=$?
+if (( shots_rc != 0 )); then
+    tail -n 20 "$BUILD_DIR/screens.log" >&2
+    if (( shots_rc > 128 )); then
+        fail "the screenshot run crashed (signal $((shots_rc - 128))) after $(find "$BUILD_DIR/shots" -name '*.png' | wc -l) screens"
+    fi
+    fail "the screenshot run exited with code $shots_rc (see $BUILD_DIR/screens.log)"
+fi
 if grep -E " W qrc:| E |TypeError|ReferenceError" "$BUILD_DIR/screens.log"; then
     fail "QML errors while loading the screens"
 fi

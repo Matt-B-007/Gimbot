@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: MIT
+name: Bug report
+description: Something in Gimbot doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! The quickest way: in Gimbot, **Help (?) › Report a problem › Save to file** (or run `gimbot --report`), then attach the file below. Personal details are hidden in it already.
+        **This issue is public.** Don't paste anything you wouldn't want others to see.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      placeholder: "I pressed Up and the camera moved down."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can it be made to happen again?
+      placeholder: "1. Open Gimbot  2. …"
+  - type: input
+    id: version
+    attributes:
+      label: Gimbot version
+      description: In Help (?) › About, or run `gimbot --version`.
+      placeholder: 0.1.0-beta.12
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - The install line (install.sh)
+        - From the AUR
+        - Built it myself
+    validations:
+      required: true
+  - type: input
+    id: camera
+    attributes:
+      label: Camera and firmware
+      placeholder: OBSBOT Tiny 2, firmware 6.0.13.1
+  - type: textarea
+    id: report
+    attributes:
+      label: Report
+      description: Drag the saved gimbot-report-….txt file here.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before sending
+      options:
+        - label: I'm on the newest version, or I've said which one I'm on.
+        - label: I've removed anything private from what I pasted.

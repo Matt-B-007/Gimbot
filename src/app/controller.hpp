@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // The bridge between the interface and the camera.
 //
 // Every setting lives in one map, `values`, keyed by name ("hdr", "zoom",

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -130,7 +131,7 @@ ColumnLayout {
                         anchors.centerIn: parent
                         visible: card.modelData.thumbnail.length === 0
                         name: "camera"
-                        color: "#4b5057"
+                        color: "#4b586b"
                         size: 22
                     }
                 }

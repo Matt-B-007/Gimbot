@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Layouts
 
@@ -99,7 +100,7 @@ Rectangle {
             implicitHeight: help.implicitHeight + 32
             radius: Theme.radius + 2
             color: Theme.surface
-            border.color: Theme.border
+            border.color: Theme.cardEdge
             ColumnLayout {
                 id: help
                 x: 16; y: 16

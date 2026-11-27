@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -163,6 +164,7 @@ Sheet {
             text: qsTr("Save to file")
             iconName: "download"
             variant: "primary"
+            glow: true // the screen's one main action
             onClicked: {
                 const path = platform.saveReport(summary.text, what.text, serialBox.checked)
                 if (path.length > 0) {

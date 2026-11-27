@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "platform.hpp"
 #include "previewformat.hpp"
 
@@ -24,6 +25,7 @@
 #include <QIcon>
 #include <QRegularExpression>
 #include <QMenu>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QSysInfo>
 #include <QSystemTrayIcon>
@@ -80,6 +82,14 @@ bool Platform::kdeIntegration() const
 #endif
 }
 QString Platform::repoUrl() const { return m_repo.isEmpty() ? QString() : "https://github.com/" + m_repo; }
+bool Platform::reduceMotion() const
+{
+    const QString file = QStandardPaths::locate(QStandardPaths::GenericConfigLocation, QStringLiteral("kdeglobals"));
+    if (file.isEmpty()) return false;
+    QSettings kde(file, QSettings::IniFormat);
+    return kde.value(QStringLiteral("KDE/AnimationDurationFactor"), 1.0).toDouble() <= 0.0;
+}
+
 bool Platform::repoPublic() const
 {
 #ifdef GIMBOT_REPO_PRIVATE
@@ -431,6 +441,11 @@ QString Platform::diagnostics(bool includeSerial) const
 #endif
     out << QStringLiteral("KDE integration: %1 (%2)").arg(kdeIntegration() ? "yes" : "no", QStringLiteral(GIMBOT_KDE_STATUS));
     out << QStringLiteral("System: %1").arg(system());
+    out << QStringLiteral("Updates: %1, installed %2")
+               .arg(m_updater->channel() == 2 ? "beta" : m_updater->channel() == 1 ? "stable" : "off",
+                    m_updater->installType() == QLatin1String("aur") ? "from the AUR"
+                    : m_updater->installType() == QLatin1String("script") ? "with install.sh"
+                                                                           : "by hand");
     if (m_cam->connected()) {
         out << QStringLiteral("Camera: %1, firmware %2%3")
                    .arg(m_cam->model(), m_cam->firmware(),
@@ -448,7 +463,7 @@ QString Platform::diagnostics(bool includeSerial) const
         if (!crash.isEmpty()) out << QString() << QStringLiteral("Last crash:") << crash.left(4000).trimmed();
     }
     out << QString() << QStringLiteral("Recent log:");
-    out << Logger::recent(80);
+    out << (m_reportFromFile ? Logger::fileTail(80) : Logger::recent(80));
     return redactText(out.join('\n'), includeSerial);
 }
 
@@ -539,6 +554,12 @@ DBusService::DBusService(Controller *cam, Platform *platform, QObject *parent)
 }
 
 void DBusService::Activate() { emit m_platform->showRequested(); }
+
+QString DBusService::SaveReport()
+{
+    // `gimbot --report` while Gimbot is running: the running copy knows the camera.
+    return m_platform->saveReport(QString(), QString(), false);
+}
 
 int DBusService::Run(const QStringList &args, QString &output)
 {

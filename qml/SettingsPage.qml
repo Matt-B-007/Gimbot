@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
@@ -105,6 +106,15 @@ Rectangle {
                 Layout.leftMargin: 16
                 spacing: 2
                 model: root.navItems
+                Rectangle { // the sidebar surface
+                    parent: nav
+                    anchors.fill: parent
+                    anchors.margins: -8
+                    anchors.bottomMargin: 16
+                    z: -1
+                    radius: Theme.radius
+                    color: Theme.sidebar
+                }
                 interactive: false
                 delegate: AbstractButtonLike {
                     id: navItem
@@ -639,6 +649,11 @@ Rectangle {
                                 currentIndex: root.v.systemAccent ? 1 : 0
                                 onActivated: (i) => cam.set("systemAccent", i === 1)
                             }
+                        }
+                        SettingRow {
+                            label: qsTr("Plain background")
+                            description: qsTr("Hides the faint dot pattern behind the preview when there's no picture. It's also hidden when animations are turned off in System Settings.")
+                            Toggle { checked: root.v.plainBackground; onToggled: cam.set("plainBackground", checked) }
                         }
                         SettingRow {
                             label: qsTr("Show framing grid on the preview")

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Shapes
 
@@ -11,6 +12,7 @@ Item {
 
     implicitWidth: size
     implicitHeight: size
+
 
     readonly property var paths: ({
         "moon": "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
@@ -58,23 +60,30 @@ Item {
         "alert": "M12 3l10 18H2z M12 10v4 M12 17.5v.2"
     })
 
-    Shape {
-        width: 24
-        height: 24
-        scale: root.size / 24
-        transformOrigin: Item.TopLeft
-        // Render into a texture: smooth edges on the GPU, and correct
-        // clipping inside scroll areas.
-        layer.enabled: root.visible // re-rendered when shown, so color changes made while hidden appear
-        layer.samples: 4
-        layer.smooth: true
-        ShapePath {
-            strokeColor: root.color
-            strokeWidth: root.stroke
-            fillColor: "transparent"
-            capStyle: ShapePath.RoundCap
-            joinStyle: ShapePath.RoundJoin
-            PathSvg { path: root.paths[root.name] || "" }
+    // The shape is made while the icon is shown and dropped while it's
+    // hidden: a fresh one always has the current color, and its drawing
+    // layer never has to be switched off and on (doing that to a live shape
+    // could crash Qt's shape renderer).
+    Loader {
+        active: root.visible
+        sourceComponent: Shape {
+            width: 24
+            height: 24
+            scale: root.size / 24
+            transformOrigin: Item.TopLeft
+            // Render into a texture: smooth edges on the GPU, and correct
+            // clipping inside scroll areas.
+            layer.enabled: true
+            layer.samples: 4
+            layer.smooth: true
+            ShapePath {
+                strokeColor: root.color
+                strokeWidth: root.stroke
+                fillColor: "transparent"
+                capStyle: ShapePath.RoundCap
+                joinStyle: ShapePath.RoundJoin
+                PathSvg { path: root.paths[root.name] || "" }
+            }
         }
     }
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
 # Gimbot installer and updater for CachyOS, Arch and other Arch-based systems.
 #
 # Install:   curl -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh | sh
@@ -20,6 +21,7 @@
 #
 # Options:
 #   --channel stable|beta   Which releases to follow (default: stable, or your saved choice)
+#   --beta                  Same as --channel beta
 #   --version TAG           Install this release tag instead of the newest
 #   --from-source           Build the latest uploaded files instead of a release
 #                           (NOT verified: no checksum or signature)
@@ -30,7 +32,9 @@
 #   --uninstall             Remove Gimbot (asks whether to delete settings too)
 #   --purge                 With --uninstall: also delete settings, logs and the saved SDK
 #   --keep-data             With --uninstall: keep them
+#   --no-launch             Don't offer to open Gimbot afterwards
 #   --yes                   Don't ask questions
+#   --self-test             Test this script's own logic and exit (old name: --selftest)
 #   --gui                   Machine-readable progress for the Gimbot app (implies --yes)
 
 # Started with sh (for example `curl … | sh`)? Run again with bash, which the
@@ -62,6 +66,7 @@ PUBKEYS=("RWQcs3jtP2jTiAMafwQX8UwciSjOH4o9tQcCVvYl2NkdnOeVupKPlhvC"  # primary, 
          "RWRObC9qlP598z1kmTFw7W+TKYKk3w2/63qWyRWkvRSkqGwGEgjmOlGe") # backup,  key id F37DFE946A2F6C4E
 
 channel=""
+no_launch=0
 version=""
 from_source=0
 rollback=0
@@ -296,6 +301,8 @@ selftest() {
 while (( $# )); do
     case "$1" in
         --channel) channel="${2:-}"; shift 2 ;;
+        --beta) channel=beta; shift ;;
+        --no-launch) no_launch=1; shift ;;
         --version) version="${2:-}"; shift 2 ;;
         --sdk) sdk="${2:-}"; shift 2 ;;
         --source) source_dir="${2:-}"; shift 2 ;;
@@ -307,7 +314,7 @@ while (( $# )); do
         --keep-data) purge=no; shift ;;
         --yes|-y) assume_yes=1; shift ;;
         --gui) gui=1; assume_yes=1; shift ;;
-        --selftest) selftest ;;
+        --self-test | --selftest) selftest ;;
         -h|--help)
             if [[ -f "$0" ]]; then sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
             else echo "Options: --channel stable|beta, --version TAG, --from-source, --rollback, --uninstall, --check, --yes"; fi
@@ -653,7 +660,7 @@ if (( ! gui )); then
     echo "  ${green}${bold}Done.${reset} Open Gimbot from your app menu, or run: gimbot"
     echo "  ${dim}Updates: Gimbot tells you when one is out and installs it with one click.${reset}"
     echo
-    if [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && [[ "$(ask "Open Gimbot now? [Y/n]" y)" =~ ^[Yy] ]]; then
+    if (( ! no_launch )) && [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && [[ "$(ask "Open Gimbot now? [Y/n]" y)" =~ ^[Yy] ]]; then
         (setsid gimbot >/dev/null 2>&1 &)
     fi
 fi

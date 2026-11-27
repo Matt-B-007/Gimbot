@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Used when Gimbot is built without the OBSBOT SDK: no real cameras, only the
 // simulated one (run with --fake). Lets the project build and test anywhere.
 #include "camera.hpp"

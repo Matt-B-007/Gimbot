@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "controller.hpp"
 #include "settingsstore.hpp"
 
@@ -274,6 +275,7 @@ void Controller::defineSettings()
     def("showGrid", Kind::App, true, {});
     def("theme", Kind::App, 0, {}); // 0 follow system, 1 dark, 2 light
     def("systemAccent", Kind::App, false, {});
+    def("plainBackground", Kind::App, false, {}); // no dot pattern behind empty areas
 }
 
 // ---------------------------------------------------------------- plumbing
