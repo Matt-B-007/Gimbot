@@ -33,6 +33,11 @@ class Updater : public QObject {
     Q_PROPERTY(int retryIn READ retryIn NOTIFY retryInChanged)
 
     Q_PROPERTY(bool canInstall READ canInstall CONSTANT)
+    // "script" (one-line installer), "aur" or "manual" (built by hand).
+    Q_PROPERTY(QString installType READ installType CONSTANT)
+    Q_PROPERTY(QString aurCommand READ aurCommand CONSTANT)
+    // The version Go back would reinstall, or empty if none is saved.
+    Q_PROPERTY(QString previousVersion READ previousVersion NOTIFY installChanged)
     Q_PROPERTY(QString installState READ installState NOTIFY installChanged) // idle running done failed
     Q_PROPERTY(int installProgress READ installProgress NOTIFY installChanged)
     Q_PROPERTY(QString installStatus READ installStatus NOTIFY installChanged)
@@ -55,7 +60,12 @@ public:
     bool usedDnsFallback() const { return m_dnsFallback; }
     int retryIn() const { return m_retryIn; }
 
-    bool canInstall() const { return m_simulated || (!m_helper.isEmpty() && configured()); }
+    // AUR installs update through the AUR helper, not here.
+    bool canInstall() const { return m_simulated || (!m_helper.isEmpty() && configured() && m_installType != "aur"); }
+    QString installType() const { return m_installType; }
+    QString aurCommand() const;
+    QString previousVersion() const;
+    static QString packagesDir(); // ~/.local/share/gimbot/packages (current + previous)
     QString installState() const { return m_installState; }
     int installProgress() const { return m_progress; }
     QString installStatus() const { return m_status; }
@@ -74,6 +84,8 @@ public:
     Q_INVOKABLE void rebuild();
     // Remove Gimbot; purge also deletes settings, logs and the saved SDK.
     Q_INVOKABLE void uninstall(bool purge);
+    // Reinstall the previously installed version (kept by the installer).
+    Q_INVOKABLE void rollback();
     Q_INVOKABLE void cancelInstall();
     Q_INVOKABLE void restartApp();
     // For testing the update screens: --fake runs a pretend update.
@@ -81,19 +93,20 @@ public:
 
     // -1, 0, 1 like strcmp; understands "1.2.0-beta.3".
     static int compareVersions(const QString &a, const QString &b);
-    // The version in a CMakeLists.txt, and one version's notes from CHANGELOG.md.
-    static QString versionInCmake(const QByteArray &cmake);
+    // One version's notes from CHANGELOG.md (for What's new).
     static QString changelogSection(const QByteArray &changelog, const QString &version);
 
-    // Which version to offer, from the releases list and the uploaded files.
+    // Which version to offer, from the signed releases in the releases list.
     struct Choice {
         bool valid = false;     // the releases answer made sense
         QString version;        // empty: nothing to offer
-        QString tag;            // release tag, or "main" for uploaded files
+        QString tag;            // release tag
         QJsonObject release;    // the chosen release, if any
-        bool beta = false, isSwitch = false, uploaded = false;
+        bool beta = false, isSwitch = false;
     };
-    static Choice choose(const QByteArray &releasesJson, const QByteArray &mainCmake, const QString &current, int channel);
+    static Choice choose(const QByteArray &releasesJson, const QString &current, int channel);
+    // A release counts only with its source, SHA256SUMS and signature attached.
+    static bool isSigned(const QJsonObject &release);
 
 signals:
     // A check failed. manual: the user asked for it, so tell them right away.
@@ -112,12 +125,13 @@ private:
     void fetch(const QString &url, bool json, std::function<void(bool, const QByteArray &, const QString &)> done);
     void fetchWithCurl(const QString &url, bool json, int dohIndex,
                        std::function<void(bool, const QByteArray &, const QString &)> done);
-    void decide(const QByteArray &releasesJson, const QByteArray &mainCmake);
+    void decide(const QByteArray &releasesJson);
+    static QString readInstallType();
     void fail(const QString &message);
 
     QNetworkAccessManager m_net;
     QTimer m_timer;
-    QString m_repo, m_current, m_helper;
+    QString m_repo, m_current, m_helper, m_installType;
     int m_channel = 1;
     QString m_state = "idle", m_latest, m_tag, m_url, m_notes, m_lastChecked;
     bool m_beta = false, m_switch = false, m_simulated = false;

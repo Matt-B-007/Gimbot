@@ -1,4 +1,7 @@
 #include "controller.hpp"
+#include "settingsstore.hpp"
+
+#include <QFileInfo>
 
 #include "commands.hpp"
 
@@ -102,6 +105,16 @@ const QHash<QString, QPair<QString, QVariant>> kImplies = {{"framing", {"mode", 
 
 Controller::Controller(bool simulated, QObject *parent) : QObject(parent), m_simulated(simulated)
 {
+    // Settings housekeeping first: version + migrations, then a backup.
+    settingsstore::migrate(m_settings);
+    const QString backups = QFileInfo(m_settings.fileName()).absolutePath() + "/backups";
+    settingsstore::backup(m_settings.fileName(), backups);
+    m_backupTimer.setSingleShot(true);
+    m_backupTimer.setInterval(5000); // after changes settle; backup() itself waits 15 min between copies
+    connect(&m_backupTimer, &QTimer::timeout, this, [this, backups] {
+        m_settings.sync();
+        settingsstore::backup(m_settings.fileName(), backups);
+    });
     defineSettings();
     for (auto it = m_table.cbegin(); it != m_table.cend(); ++it) {
         const bool persisted = it->kind == Kind::Pushed || it->kind == Kind::App;
@@ -321,7 +334,10 @@ void Controller::set(const QString &key, const QVariant &value)
     emit valuesChanged();
     if (key == "mirrored" || key == "invertPan" || key == "invertTilt") emit positionChanged();
 
-    if (it->kind == Kind::Pushed || it->kind == Kind::App) m_settings.setValue("settings/" + key, v);
+    if (it->kind == Kind::Pushed || it->kind == Kind::App) {
+        m_settings.setValue("settings/" + key, v);
+        m_backupTimer.start();
+    }
     if (it->kind == Kind::App) emit appSettingChanged(key, v);
     if (key.startsWith("zone") && key != "zoneEnabled" && key != "zoneAutoSelect" && m_values["guideLight"].toBool()) {
         // Light the camera's guide pattern while the area is being adjusted.
@@ -947,6 +963,7 @@ void Controller::saveProfile(const QString &name)
     QVariantMap snap;
     for (const auto &k : kProfileKeys) snap[k] = m_values.value(k);
     m_settings.setValue("profiles/" + name.trimmed(), snap);
+    m_backupTimer.start();
     emit profilesChanged();
     emit notice(tr("Saved profile “%1”").arg(name.trimmed()));
 }

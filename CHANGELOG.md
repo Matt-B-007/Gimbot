@@ -3,6 +3,27 @@
 What changed in each version of Gimbot. The newest is at the top; the app
 shows a version's notes in its update window.
 
+## 0.1.0-beta.10 (2026-11-26)
+Safer updates and better crash reports. This is the first signed release.
+- **Updates are verified.** Each release carries SHA256SUMS and a minisign
+  signature; the installer and Update now refuse a download unless both
+  check out, so a damaged or changed download can't be installed.
+- **Signed releases only.** Updates come from published releases with a
+  signature. `--from-source` still builds the latest uploaded files, clearly
+  marked as not verified.
+- **Self-test.** `gimbot --self-test` (and `--quick`) checks the app works;
+  each new build runs the quick one before it replaces the installed one.
+- **Go back.** The previous version is kept, so Settings › Updates or
+  `gimbot-update --rollback` can reinstall it if an update misbehaves.
+- **Crash details.** If Gimbot crashes, the next start says so and the bug
+  report includes a short trace (the last 10 are kept).
+- **Settings are versioned and backed up** every 15 minutes at most (5 kept),
+  so future changes can migrate them safely.
+- **Logs moved** to `~/.local/state/gimbot` (3 files of 1 MB at most).
+- **AUR installs** show the `paru` command instead of updating themselves.
+- **Installer** works with `| sh`, and explains why it needs your password.
+- **The tour** starts by itself only on new installs.
+
 ## 0.1.0-beta.9 (2026-11-26)
 - The preview quality menu lists every resolution and frame rate the camera
   really offers (for example 1080p · 60 fps, 1080p · 30 fps, 4K · 30 fps),

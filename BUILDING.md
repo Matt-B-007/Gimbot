@@ -11,16 +11,41 @@ Each version arrives as one zip (`Gimbot-<version>-source.zip`). Either:
 - **Upload the zip itself** to the top of the repository. GitHub unpacks it,
   puts the files in place and deletes the zip.
 
-Then the **Publish** job (`.github/workflows/publish.yml`) creates the GitHub
-release for the version in `CMakeLists.txt` (a pre-release if it's a beta),
-with that version's notes from `CHANGELOG.md`. You don't need to make the
-release by hand, and nothing else is needed for people to get it: the
-installer and the app's update check also look at the uploaded files, so
-even without a release the new version is offered.
+The **Publish** job (`.github/workflows/publish.yml`) then, for the version in
+`CMakeLists.txt` if it has no release yet:
+
+1. runs every check (`scripts/check.sh`);
+2. makes `Gimbot-<version>-source.tar.gz` (and a `.zip`), `SHA256SUMS`, and
+   `SHA256SUMS.minisig` signed with the **primary** key from the repository
+   secret `MINISIGN_SECRET_KEY`, and verifies them;
+3. creates a **draft** release with those files and the version's notes from
+   `CHANGELOG.md`, adds a build provenance attestation, checks every file is
+   attached, then publishes it (a pre-release if the version is a beta).
+
+If anything fails, nothing is published, and a draft left behind is deleted
+(the job's log says so). The job refuses to run without the signing secret.
+
+The installer and Update now only accept a release whose `SHA256SUMS` carries
+a valid signature from the primary or the **backup** key (both public keys are
+in `install.sh`) and whose source matches its checksum. The backup secret key
+is kept offline and only used if the primary is lost or leaked.
 
 GitHub doesn't let tools change files in `.github/workflows` without extra
 permission. If an upload of that folder is refused, add or update those files
 once through the GitHub website.
+
+## Checks
+
+```sh
+bash scripts/check.sh
+```
+
+runs exactly what CI runs, in the same order: shell scripts (`bash -n` +
+shellcheck at every severity), workflow files (actionlint), web addresses,
+version numbers agreeing, the build, unit and controller tests,
+`gimbot --self-test`, the installer's self-test, and loading every screen.
+Run it before every zip. CI pins shellcheck 0.11.0 and actionlint 1.7.12
+(`pip install shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25`).
 
 ### Version numbers
 
@@ -28,8 +53,9 @@ In `CMakeLists.txt`, `project(gimbot VERSION 0.1.1 …)` takes numbers only and
 `set(GIMBOT_VERSION "0.1.1")` is the full version. A beta of the *next*
 version is `0.1.2-beta.1` (a beta sorts before the release it leads to, so
 `0.1.1-beta.1` would be older than `0.1.1`). Add each version to
-`CHANGELOG.md` and to `<releases>` in
-`data/io.github.Matt_B_007.Gimbot.metainfo.xml`.
+`CHANGELOG.md` (top entry), `<releases>` in
+`data/io.github.Matt_B_007.Gimbot.metainfo.xml` and the beta PKGBUILD;
+`scripts/check.sh` fails if they disagree.
 
 The normal update channel ignores betas; the beta channel takes both.
 
@@ -95,16 +121,6 @@ KDE users can assign system-wide keys in **System Settings › Shortcuts › Gim
 
 `GIMBOT_DEBUG=1` shows the SDK's own log; **Settings › App › Detailed logging**
 does the same from the app. Logs live in `~/.local/share/gimbot/logs/`.
-
-## Tests
-
-```sh
-ctest --test-dir build --output-on-failure
-bash install.sh --selftest
-```
-
-They need no camera and include a check that every web address in the source
-is one Gimbot expects (`tests/check_urls.sh`).
 
 ### AUR
 

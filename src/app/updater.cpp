@@ -1,5 +1,8 @@
 #include "updater.hpp"
 
+#include <QFile>
+#include <QDir>
+#include <QFileInfo>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QJsonArray>
@@ -27,6 +30,7 @@ Updater::Updater(const QString &repo, const QString &currentVersion, QObject *pa
     });
     if (!configured()) m_state = "off";
     m_helper = QStandardPaths::findExecutable("gimbot-update");
+    m_installType = readInstallType();
 }
 
 void Updater::setChannel(int channel)
@@ -101,19 +105,15 @@ void Updater::startCheck(bool manual)
     m_dnsFallback = false;
     setState("checking");
 
-    // 1. Published releases. 2. The version in the files last uploaded to the
-    // main branch, so an upload alone is enough for people to get it.
+    // Published releases only. A release counts once its source, checksums
+    // and signature are attached (the installer verifies them).
     fetch(QStringLiteral("https://api.github.com/repos/%1/releases?per_page=30").arg(m_repo), true,
           [this](bool ok, const QByteArray &releases, const QString &error) {
               if (!ok) {
                   fail(error);
                   return;
               }
-              fetch(QStringLiteral("https://raw.githubusercontent.com/%1/main/CMakeLists.txt").arg(m_repo), false,
-                    [this, releases](bool ok2, const QByteArray &cmake, const QString &) {
-                        // The uploaded version is a bonus; releases alone still work.
-                        decide(releases, ok2 ? cmake : QByteArray());
-                    });
+              decide(releases);
           });
 }
 
@@ -245,16 +245,21 @@ QString Updater::changelogSection(const QByteArray &changelog, const QString &ve
     return out.join('\n').trimmed();
 }
 
-QString Updater::versionInCmake(const QByteArray &cmake)
+bool Updater::isSigned(const QJsonObject &release)
 {
-    static const QRegularExpression re(QStringLiteral("^set\\(GIMBOT_VERSION \"([^\"]+)\"\\)"),
-                                       QRegularExpression::MultilineOption);
-    const auto m = re.match(QString::fromUtf8(cmake));
-    return m.hasMatch() ? m.captured(1) : QString();
+    // Source, checksums and signature, as the release workflow attaches them.
+    const QString version = release.value("tag_name").toString().mid(1);
+    bool source = false, sums = false, sig = false;
+    for (const auto &a : release.value("assets").toArray()) {
+        const QString name = a.toObject().value("name").toString();
+        source |= name == QStringLiteral("Gimbot-%1-source.tar.gz").arg(version);
+        sums |= name == QLatin1String("SHA256SUMS");
+        sig |= name == QLatin1String("SHA256SUMS.minisig");
+    }
+    return source && sums && sig;
 }
 
-Updater::Choice Updater::choose(const QByteArray &releasesJson, const QByteArray &mainCmake, const QString &current,
-                                int channel)
+Updater::Choice Updater::choose(const QByteArray &releasesJson, const QString &current, int channel)
 {
     Choice c;
     const auto doc = QJsonDocument::fromJson(releasesJson);
@@ -266,41 +271,30 @@ Updater::Choice Updater::choose(const QByteArray &releasesJson, const QByteArray
         const auto o = v.toObject();
         if (o.value("draft").toBool()) continue;
         if (o.value("prerelease").toBool() && channel < 2) continue;
+        if (!isSigned(o)) continue; // not available yet (or from before signing started)
         const QString tag = o.value("tag_name").toString();
         if (best.isEmpty() || compareVersions(tag, best) > 0) {
             best = tag;
             bestObj = o;
         }
     }
-    // The files last uploaded to main win if they're newer than any release
-    // (a beta version only counts for people following betas).
-    const QString uploaded = versionInCmake(mainCmake);
-    const bool uploadedBeta = uploaded.contains('-');
-    c.uploaded = !uploaded.isEmpty() && (channel == 2 || !uploadedBeta)
-                 && (best.isEmpty() || compareVersions("v" + uploaded, best) > 0);
-    QString version = best.startsWith('v') ? best.mid(1) : best;
-    if (c.uploaded) version = uploaded;
+    const QString version = best.startsWith('v') ? best.mid(1) : best;
     // On a beta but following normal releases again: offer the newest
     // normal release even though its number is lower.
     const bool onBeta = current.contains('-');
     c.isSwitch = !version.isEmpty() && channel == 1 && onBeta && compareVersions(version, current) < 0;
     if (version.isEmpty() || (compareVersions(version, current) <= 0 && !c.isSwitch)) return c;
     c.version = version;
-    if (c.uploaded) {
-        c.tag = QStringLiteral("main");
-        c.beta = uploadedBeta;
-    } else {
-        c.tag = best;
-        c.release = bestObj;
-        c.beta = bestObj.value("prerelease").toBool();
-    }
+    c.tag = best;
+    c.release = bestObj;
+    c.beta = bestObj.value("prerelease").toBool();
     return c;
 }
 
-void Updater::decide(const QByteArray &releasesJson, const QByteArray &mainCmake)
+void Updater::decide(const QByteArray &releasesJson)
 {
     m_lastChecked = QLocale().toString(QDateTime::currentDateTime(), QLocale::ShortFormat);
-    const Choice c = choose(releasesJson, mainCmake, m_current, m_channel);
+    const Choice c = choose(releasesJson, m_current, m_channel);
     if (!c.valid) {
         fail(tr("GitHub sent an answer Gimbot didn't understand. It will try again later."));
         return;
@@ -315,23 +309,47 @@ void Updater::decide(const QByteArray &releasesJson, const QByteArray &mainCmake
     m_latest = c.version;
     m_tag = c.tag;
     m_beta = c.beta;
-    if (!c.uploaded) {
-        m_url = c.release.value("html_url").toString();
-        m_notes = c.release.value("body").toString().left(6000);
-        qInfo() << "Update available:" << m_latest << (m_beta ? "(beta)" : "") << (m_switch ? "(switch)" : "");
-        setState("available");
-        return;
-    }
-    // Uploaded but not released: the installer builds it from the main branch.
-    m_url = QStringLiteral("https://github.com/%1").arg(m_repo);
-    m_notes.clear();
-    qInfo() << "Update available from the uploaded files:" << m_latest << (m_beta ? "(beta)" : "");
-    fetch(QStringLiteral("https://raw.githubusercontent.com/%1/main/CHANGELOG.md").arg(m_repo), false,
-          [this](bool ok, const QByteArray &changelog, const QString &) {
-              if (ok) m_notes = changelogSection(changelog, m_latest).left(6000);
-              setState("available");
-          });
+    m_url = c.release.value("html_url").toString();
+    m_notes = c.release.value("body").toString().left(6000);
+    qInfo() << "Update available:" << m_latest << (m_beta ? "(beta)" : "") << (m_switch ? "(switch)" : "");
+    setState("available");
 }
+
+// ---------------------------------------------------------------- how Gimbot was installed
+
+QString Updater::readInstallType()
+{
+#ifdef GIMBOT_LIBDIR
+    QFile f(QStringLiteral(GIMBOT_LIBDIR "/gimbot/install-type"));
+    if (f.open(QIODevice::ReadOnly)) {
+        const QString t = QString::fromUtf8(f.readAll()).trimmed();
+        if (t == "aur" || t == "script") return t;
+    }
+#endif
+    return QStringLiteral("manual");
+}
+
+QString Updater::packagesDir()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/gimbot/packages";
+}
+
+QString Updater::previousVersion() const
+{
+    // The installer keeps previous/<package file> + previous/version.
+    const QDir dir(packagesDir() + "/previous");
+    if (dir.entryList({"*.pkg.tar*"}, QDir::Files).isEmpty()) return {};
+    QFile f(dir.filePath("version"));
+    if (!f.open(QIODevice::ReadOnly)) return {};
+    return QString::fromUtf8(f.readAll()).trimmed();
+}
+
+QString Updater::aurCommand() const
+{
+    return m_current.contains('-') ? QStringLiteral("paru -Syu gimbot-beta") : QStringLiteral("paru -Syu gimbot");
+}
+
+void Updater::rollback() { run("rollback", {"--gui", "--rollback"}); }
 
 // ---------------------------------------------------------------- installing
 
@@ -375,6 +393,7 @@ void Updater::run(const QString &action, const QStringList &args)
             m_progress = 100;
             m_status = m_action == "uninstall" ? tr("Gimbot is uninstalled")
                        : m_action == "rebuild" ? tr("Gimbot is rebuilt with the new SDK")
+                       : m_action == "rollback" ? tr("Went back to the previous version")
                                                : tr("Gimbot %1 is installed").arg(m_latest);
             qInfo().noquote() << m_action << "finished";
         } else {
@@ -382,6 +401,7 @@ void Updater::run(const QString &action, const QStringList &args)
             if (m_error.isEmpty())
                 m_error = code == 3 ? tr("The OBSBOT SDK zip wasn't found.")
                           : m_action == "uninstall" ? tr("Uninstalling didn't finish.")
+                          : m_action == "rollback" ? tr("Going back didn't finish.")
                                                     : tr("The update didn't finish.");
             qWarning() << m_action << "failed:" << m_error;
         }

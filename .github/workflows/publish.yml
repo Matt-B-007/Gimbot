@@ -3,9 +3,11 @@
 # 1. If a Gimbot zip was uploaded to the top of the repository, unpack it over
 #    the files (except .github/workflows, which this job isn't allowed to
 #    change), delete the zip and commit.
-# 2. If the version in CMakeLists.txt has no release yet, create one: a
-#    pre-release for betas, with that version's notes from CHANGELOG.md and
-#    the source zip attached.
+# 2. If the version in CMakeLists.txt has no release yet: run every check
+#    (scripts/check.sh), make the source tarball, SHA256SUMS and its minisign
+#    signature, create a DRAFT release with them, verify, then publish.
+#    Anything failing stops before publishing ("fails closed"); a draft left
+#    behind by a failure is deleted, and the log says so.
 name: Publish
 
 on:
@@ -15,16 +17,31 @@ on:
 
 permissions:
   contents: write
+  id-token: write      # build provenance attestation
+  attestations: write
 
 concurrency: publish
 
 jobs:
   publish:
+    name: Publish a signed release
     runs-on: ubuntu-latest
+    container: archlinux:latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Install build tools, signing tool and pinned checkers
+        run: |
+          pacman -Syu --noconfirm --needed base-devel cmake extra-cmake-modules git dbus python-pip \
+            qt6-base qt6-declarative qt6-multimedia qt6-multimedia-ffmpeg qt6-svg \
+            kcoreaddons kcrash kglobalaccel kstatusnotifieritem \
+            minisign github-cli unzip zip
+          pip install --break-system-packages shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25
+
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Trust the checked-out folder (git in a container)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Unpack an uploaded zip
         run: |
@@ -62,30 +79,111 @@ jobs:
             git push origin "HEAD:${GITHUB_REF_NAME:-main}"
           fi
 
-      - name: Release this version if it's new
+      - name: Is this version new?
+        id: version
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="$(sed -nE 's/^set\(GIMBOT_VERSION "([^"]+)".*/\1/p' CMakeLists.txt | head -n1)"
           if [[ -z "$version" ]]; then echo "::error::No GIMBOT_VERSION in CMakeLists.txt"; exit 1; fi
-          tag="v$version"
-          if gh release view "$tag" >/dev/null 2>&1; then echo "$tag is already released."; exit 0; fi
-          # Notes: this version's section of CHANGELOG.md.
-          awk -v v="$version" '
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "v$version is already released; nothing to publish."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Signing key is set up (MINISIGN_SECRET_KEY)
+        if: steps.version.outputs.new == 'true'
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+        run: |
+          if [[ -z "$MINISIGN_SECRET_KEY" ]]; then
+            echo "::error::The repository secret MINISIGN_SECRET_KEY is missing, so the release can't be signed. Nothing was published."
+            exit 1
+          fi
+
+      - name: Run every check (bash scripts/check.sh)
+        if: steps.version.outputs.new == 'true'
+        run: bash scripts/check.sh
+
+      - name: Make the source tarball, checksums and signature
+        if: steps.version.outputs.new == 'true'
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p dist
+          git archive --format=tar.gz --prefix="Gimbot-$VERSION/" -o "dist/Gimbot-$VERSION-source.tar.gz" HEAD
+          git archive --format=zip --prefix="Gimbot/" -o "dist/Gimbot-$VERSION-source.zip" HEAD
+          (cd dist && sha256sum "Gimbot-$VERSION-source.tar.gz" "Gimbot-$VERSION-source.zip" > SHA256SUMS)
+          keyfile="$(mktemp)"
+          # minisign wants its "untrusted comment:" first line; add it if the
+          # secret was saved without it.
+          if [[ "$MINISIGN_SECRET_KEY" == "untrusted comment:"* ]]; then
+            printf '%s\n' "$MINISIGN_SECRET_KEY" > "$keyfile"
+          else
+            printf 'untrusted comment: minisign secret key\n%s\n' "$MINISIGN_SECRET_KEY" > "$keyfile"
+          fi
+          minisign -S -s "$keyfile" -m dist/SHA256SUMS -t "Gimbot $VERSION" < /dev/null
+          rm -f "$keyfile"
+          # Check it the way the installer will, with the embedded public key.
+          minisign -Vm dist/SHA256SUMS -x dist/SHA256SUMS.minisig -P RWQcs3jtP2jTiAMafwQX8UwciSjOH4o9tQcCVvYl2NkdnOeVupKPlhvC
+          (cd dist && sha256sum -c SHA256SUMS)
+          ls -l dist
+
+      - name: Release notes from CHANGELOG.md
+        if: steps.version.outputs.new == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
             /^## / { if (found) exit; split(substr($0, 4), w, " "); x = w[1]; sub(/^v/, "", x); found = (x == v); next }
-            found' CHANGELOG.md > notes.md 2>/dev/null || true
-          [[ -s notes.md ]] || echo "Gimbot $version" > notes.md
+            found' CHANGELOG.md > notes.md
+          if [[ ! -s notes.md ]]; then echo "::error::CHANGELOG.md has no entry for $VERSION"; exit 1; fi
           {
             echo
             echo "**Install or update:**"
             echo
             echo '```sh'
-            echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/install.sh | bash"
+            echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/install.sh | sh"
             echo '```'
+            echo
+            echo "Downloads are checked with SHA256SUMS and its minisign signature before they're built."
           } >> notes.md
-          pre=""
-          [[ "$version" == *-* ]] && pre="--prerelease"
-          git archive --format=zip --prefix="Gimbot/" -o "Gimbot-$version-source.zip" HEAD
-          gh release create "$tag" --target "$(git rev-parse HEAD)" --title "Gimbot $version" \
-            --notes-file notes.md $pre "Gimbot-$version-source.zip"
-          echo "Released $tag."
+
+      - name: Build provenance attestation
+        if: steps.version.outputs.new == 'true'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*
+
+      - name: Create a draft release, upload, verify, publish
+        if: steps.version.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          tag="v$VERSION"
+          pre=()
+          if [[ "$VERSION" == *-* ]]; then pre=(--prerelease); fi
+          gh release create "$tag" --draft --target "$(git rev-parse HEAD)" --title "Gimbot $VERSION" \
+            --notes-file notes.md "${pre[@]}" dist/*
+          echo "draft=$tag" >> "$GITHUB_ENV"
+          # Every file must be on the draft before it goes public.
+          for f in dist/*; do
+            gh release view "$tag" --json assets --jq '.assets[].name' | grep -qx "$(basename "$f")" \
+              || { echo "::error::$(basename "$f") didn't upload"; exit 1; }
+          done
+          gh release edit "$tag" --draft=false
+          echo "draft=" >> "$GITHUB_ENV"
+          echo "Published $tag."
+
+      - name: Remove the draft if publishing failed
+        if: failure() && env.draft != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Publishing failed; deleting the draft release ${draft} so nothing half-finished is left."
+          gh release delete "${draft}" --yes --cleanup-tag || echo "::warning::Couldn't delete the draft ${draft}; delete it on the Releases page."

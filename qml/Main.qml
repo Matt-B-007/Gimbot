@@ -154,6 +154,14 @@ ApplicationWindow {
         onOpenTour: window.startTour()
         onOpenDirectionCheck: directionCheck.open()
         onOpenUninstall: uninstallDialog.open()
+        onToast: (message) => window.toast(message, "info")
+        onConfirmGoBack: {
+            confirm.title = qsTr("Go back to Gimbot %1?").arg(updater.previousVersion)
+            confirm.message = qsTr("This reinstalls the version you had before the last update. You'll be asked for your password, and Gimbot restarts afterwards. Your settings stay.")
+            confirm.confirmText = qsTr("Go back")
+            confirm.onConfirm = () => { updater.rollback(); updateDialog.open() }
+            confirm.open()
+        }
         onConfirmFactoryReset: {
             confirm.title = qsTr("Reset the camera?")
             confirm.message = qsTr("This erases all presets, the tracking area and every camera setting, and can't be undone.")

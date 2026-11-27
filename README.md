@@ -14,19 +14,26 @@ with OBSBOT or Remo Tech.**
 2. **Paste this into a terminal:**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh | sh
 ```
 
-That's it. It asks for your password once, builds Gimbot with your SDK and
-installs it. If the SDK isn't in Downloads yet, it tells you and waits.
+That's it. It downloads the newest signed release, checks its checksum and
+signature, builds Gimbot with your SDK, tests the build and installs it. If
+the SDK isn't in Downloads yet, it tells you and waits.
 
-**Updates:** Gimbot shows **Update now** when there's a new version. Choose
-normal or beta updates in **Settings › App**.
+It asks for your password once: Gimbot is installed as a system package
+(pacman), because the OBSBOT SDK has to be built into it on your computer and
+the camera permission rule needs a system folder.
+
+**Updates:** Gimbot shows **Update now** when there's a new version, and only
+installs releases whose checksum and signature check out. Choose normal or
+beta updates in **Settings › App**. If an update misbehaves, **Go back** there
+(or `gimbot-update --rollback`) reinstalls the version you had before.
 
 **Uninstall:** **Settings › App › Uninstall Gimbot**, or:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh | sh -s -- --uninstall
 ```
 
 ## What it does
@@ -66,6 +73,23 @@ offer them); use OBSBOT Center on Windows or macOS for those.
 The installer moves the SDK zip out of Downloads into Gimbot's folder
 (`~/.local/share/gimbot/sdk`); **Settings › Device** shows it. When OBSBOT sends
 a newer SDK, save it to Downloads and Gimbot offers to rebuild with it.
+
+## Where Gimbot keeps things
+
+| What | Where |
+|---|---|
+| The app | `/usr/bin/gimbot`, `/usr/lib/gimbot/` (a pacman package, so system folders rather than `~/.local/bin`) |
+| Settings | `~/.config/gimbot/gimbot.conf` (Qt's INI format), backups in `~/.config/gimbot/backups/` |
+| Logs and crash traces | `~/.local/state/gimbot/` |
+| Saved OBSBOT SDK and packages for Go back | `~/.local/share/gimbot/` |
+| Build files while updating | `~/.cache/` (removed afterwards) |
+
+These follow the house standard shared with CachyPlay, Sluice, StowLock and
+Stream Preflight, except that the app itself lives in `/usr` because it's a
+pacman package.
+
+`gimbot --self-test` checks that everything works (`--quick` for the short
+version).
 
 Building by hand, `gimbotctl`, releasing and testing: see [BUILDING.md](BUILDING.md).
 What changed in each version: [CHANGELOG.md](CHANGELOG.md).

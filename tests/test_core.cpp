@@ -3,6 +3,11 @@
 #include "camera.hpp"
 #include "commands.hpp"
 #include "previewformat.hpp"
+#include "settingsstore.hpp"
+
+#include <QDir>
+#include <QSettings>
+#include <QTemporaryDir>
 #include "updater.hpp"
 
 #include <QtTest>
@@ -180,38 +185,41 @@ private slots:
         QCOMPARE(run(*cam, {}), 2);
     }
 
+    static QByteArray release(const char *tag, bool pre, bool signedAssets = true, bool draft = false)
+    {
+        const QString v = QString::fromLatin1(tag).mid(1);
+        const QString assets = signedAssets
+            ? QStringLiteral(R"([{"name":"Gimbot-%1-source.tar.gz"},{"name":"SHA256SUMS"},{"name":"SHA256SUMS.minisig"}])").arg(v)
+            : QStringLiteral(R"([{"name":"Gimbot-%1-source.zip"}])").arg(v);
+        return QStringLiteral(R"({"tag_name":"%1","prerelease":%2,"draft":%3,"body":"notes %1","assets":%4})")
+            .arg(QString::fromLatin1(tag), pre ? "true" : "false", draft ? "true" : "false", assets).toUtf8();
+    }
+
     void updateChoice()
     {
-        const QByteArray rel = R"([{"tag_name":"v0.1.0-beta.6","prerelease":true,"draft":false,"body":"old"},
-                                   {"tag_name":"v0.0.9","prerelease":false,"draft":false},
-                                   {"tag_name":"v9.9.9","prerelease":false,"draft":true}])";
-        const QByteArray up8 = "project(gimbot VERSION 0.1.0)\nset(GIMBOT_VERSION \"0.1.0-beta.8\")\n";
-        const QByteArray up7 = "set(GIMBOT_VERSION \"0.1.0-beta.7\")\n";
-        const QByteArray upStable = "set(GIMBOT_VERSION \"0.1.0\")\n";
-        // Beta channel: uploaded beta.8 beats the beta.6 release.
-        auto c = Updater::choose(rel, up8, "0.1.0-beta.7", 2);
+        const QByteArray rel = "[" + release("v0.1.0-beta.11", true) + "," + release("v0.1.0-beta.12", true, false) + "," +
+                               release("v0.0.9", false) + "," + release("v9.9.9", false, true, true) + "]";
+        // Beta channel: the newest SIGNED release (beta.12 has no signature yet).
+        auto c = Updater::choose(rel, "0.1.0-beta.10", 2);
         QVERIFY(c.valid);
-        QCOMPARE(c.version, QString("0.1.0-beta.8"));
-        QCOMPARE(c.tag, QString("main"));
-        QVERIFY(c.uploaded && c.beta);
-        // Uploaded = what's installed: nothing to do. Drafts never count.
-        QVERIFY(Updater::choose(rel, up7, "0.1.0-beta.7", 2).version.isEmpty());
-        // No releases at all: the upload alone is enough.
-        QCOMPARE(Updater::choose("[]", up8, "0.1.0-beta.7", 2).tag, QString("main"));
-        // Normal channel ignores an uploaded beta…
-        c = Updater::choose(rel, up8, "0.0.8", 1);
+        QCOMPARE(c.version, QString("0.1.0-beta.11"));
+        QCOMPARE(c.tag, QString("v0.1.0-beta.11"));
+        QVERIFY(c.beta);
+        QCOMPARE(c.release.value("body").toString(), QString("notes v0.1.0-beta.11"));
+        // Already on it: nothing to do. Drafts never count.
+        QVERIFY(Updater::choose(rel, "0.1.0-beta.11", 2).version.isEmpty());
+        // Normal channel ignores betas.
+        c = Updater::choose(rel, "0.0.8", 1);
         QCOMPARE(c.version, QString("0.0.9"));
-        QCOMPARE(c.tag, QString("v0.0.9"));
-        // …but takes an uploaded normal version.
-        QCOMPARE(Updater::choose(rel, upStable, "0.0.9", 1).tag, QString("main"));
         // On a beta, switching to normal offers the newest normal one (a step back).
-        c = Updater::choose(rel, up8, "0.1.0-beta.7", 1);
+        c = Updater::choose(rel, "0.1.0-beta.10", 1);
         QVERIFY(c.isSwitch);
         QCOMPARE(c.version, QString("0.0.9"));
-        // Can't read the upload: releases still work.
-        QCOMPARE(Updater::choose(rel, {}, "0.1.0-beta.5", 2).tag, QString("v0.1.0-beta.6"));
+        // Releases from before signing started are never offered.
+        QVERIFY(Updater::choose("[" + release("v0.2.0", false, false) + "]", "0.1.0", 2).version.isEmpty());
+        QVERIFY(Updater::choose("[]", "0.1.0", 2).version.isEmpty());
         // Garbage from GitHub.
-        QVERIFY(!Updater::choose("<html>", up8, "0.1.0", 2).valid);
+        QVERIFY(!Updater::choose("<html>", "0.1.0", 2).valid);
     }
 
     void changelogNotes()
@@ -221,7 +229,57 @@ private slots:
         QCOMPARE(Updater::changelogSection(log, "0.1.0-beta.7"), QString("- Older"));
         QCOMPARE(Updater::changelogSection(log, "0.2.0"), QString());
         QCOMPARE(Updater::changelogSection("## 0.1.0-beta.10\n- ten\n## 0.1.0-beta.1\n- one\n", "0.1.0-beta.1"), QString("- one"));
-        QCOMPARE(Updater::versionInCmake("x\nset(GIMBOT_VERSION \"1.2.3-beta.1\")\n"), QString("1.2.3-beta.1"));
+    }
+
+    void settingsMigration()
+    {
+        QTemporaryDir dir;
+        // New install: empty file -> current version, the tour still to come.
+        {
+            QSettings s(dir.filePath("new.conf"), QSettings::IniFormat);
+            const auto r = settingsstore::migrate(s);
+            QVERIFY(r.newInstall);
+            QCOMPARE(s.value("meta/settingsVersion").toInt(), settingsstore::kCurrentVersion);
+            QVERIFY(!s.contains("settings/tourDone"));
+        }
+        // Existing install from before versions: tour marked seen, old key gone.
+        {
+            QSettings s(dir.filePath("old.conf"), QSettings::IniFormat);
+            s.setValue("settings/previewQuality", 2);
+            s.setValue("settings/fov", 1);
+            const auto r = settingsstore::migrate(s);
+            QCOMPARE(r.from, 1);
+            QVERIFY(!r.newInstall);
+            QVERIFY(s.value("settings/tourDone").toBool());
+            QVERIFY(!s.contains("settings/previewQuality"));
+            QCOMPARE(s.value("settings/fov").toInt(), 1);
+            QCOMPARE(settingsstore::migrate(s).from, settingsstore::kCurrentVersion); // idempotent
+        }
+        // Written by a newer Gimbot (after Go back): left alone.
+        {
+            QSettings s(dir.filePath("newer.conf"), QSettings::IniFormat);
+            s.setValue("meta/settingsVersion", 99);
+            s.setValue("settings/future", 1);
+            const auto r = settingsstore::migrate(s);
+            QVERIFY(r.newer);
+            QCOMPARE(s.value("meta/settingsVersion").toInt(), 99);
+        }
+    }
+
+    void settingsBackups()
+    {
+        QTemporaryDir dir;
+        const QString file = dir.filePath("gimbot.conf");
+        const QString backups = dir.filePath("backups");
+        QVERIFY(!settingsstore::backup(file, backups)); // nothing to back up yet
+        { QSettings s(file, QSettings::IniFormat); s.setValue("a", 1); }
+        QVERIFY(settingsstore::backup(file, backups));
+        QVERIFY(!settingsstore::backup(file, backups));  // within 15 minutes
+        for (int i = 0; i < 7; ++i) {                    // interval 0: keeps only 5
+            QTest::qWait(5);
+            QVERIFY(settingsstore::backup(file, backups, 0, 5));
+        }
+        QCOMPARE(QDir(backups).entryList({"settings-*.conf"}, QDir::Files).size(), 5);
     }
 
     void previewFormat()

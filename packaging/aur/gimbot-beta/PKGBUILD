@@ -5,8 +5,8 @@
 # file before running makepkg.
 
 pkgname=gimbot-beta
-_tag=v0.1.0-beta.9          # the release tag on GitHub
-pkgver=0.1.0beta9           # the same, without characters pacman doesn't allow
+_tag=v0.1.0-beta.10         # the release tag on GitHub
+pkgver=0.1.0beta10          # the same, without characters pacman doesn't allow
 pkgrel=1
 _sdk=libdev_v2.1.0_8
 pkgdesc="Unofficial control app for OBSBOT Tiny 2 cameras (beta versions)"
@@ -46,4 +46,7 @@ check() {
 package() {
   DESTDIR="$pkgdir" cmake --install build
   install -Dm644 "Gimbot-${_tag#v}/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  # Tells the app it came from the AUR, so it shows the paru command instead of updating itself.
+  install -dm755 "$pkgdir/usr/lib/gimbot"
+  echo aur > "$pkgdir/usr/lib/gimbot/install-type"
 }

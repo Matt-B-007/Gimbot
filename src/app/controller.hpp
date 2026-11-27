@@ -192,6 +192,7 @@ private:
     bool m_internalSet = false; // set() called by the app itself, not the user
     QString m_activeProfile;
     QTimer m_resumeTimer;
+    QTimer m_backupTimer;
     QVariantMap m_undo;          // settings to restore
     QString m_undoProfile;       // deleted profile to restore
     QVariantMap m_undoProfileData;

@@ -8,7 +8,11 @@ Sheet {
     maxWidth: 560
     iconName: "download"
     readonly property bool rebuilding: updater.installAction === "rebuild"
-    title: rebuilding ? (updater.installState === "done" ? qsTr("Rebuilt with the new SDK")
+    readonly property bool goingBack: updater.installAction === "rollback"
+    title: goingBack ? (updater.installState === "done" ? qsTr("Went back to the previous version")
+                        : updater.installState === "failed" ? qsTr("Going back didn't finish")
+                        : qsTr("Going back to the previous version"))
+         : rebuilding ? (updater.installState === "done" ? qsTr("Rebuilt with the new SDK")
                          : updater.installState === "failed" ? qsTr("The rebuild didn't finish")
                          : qsTr("Rebuilding Gimbot with the new OBSBOT SDK"))
          : updater.installState === "done" ? qsTr("Update installed")

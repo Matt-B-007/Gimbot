@@ -1,5 +1,6 @@
 #include "logger.hpp"
 
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -13,7 +14,8 @@
 namespace {
 
 constexpr qint64 kMaxBytes = 1024 * 1024;
-constexpr size_t kKeepLines = 400;
+constexpr size_t kKeepLines = 500;
+constexpr int kKeepFiles = 3; // gimbot.log, gimbot.log.1, gimbot.log.2
 
 QMutex g_mutex;
 QFile *g_file = nullptr;
@@ -37,7 +39,8 @@ void rotateIfNeeded()
     if (!g_file || g_file->size() < kMaxBytes) return;
     const QString path = g_file->fileName();
     g_file->close();
-    QFile::remove(path + ".1");
+    QFile::remove(path + "." + QString::number(kKeepFiles - 1));
+    for (int i = kKeepFiles - 2; i >= 1; --i) QFile::rename(path + "." + QString::number(i), path + "." + QString::number(i + 1));
     QFile::rename(path, path + ".1");
     g_file->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
 }
@@ -65,12 +68,28 @@ void handler(QtMsgType type, const QMessageLogContext &, const QString &msg)
 
 namespace Logger {
 
-QString logDir() { return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/logs"; }
+QString stateDir()
+{
+    // XDG_STATE_HOME, falling back to ~/.local/state (Qt has no name for it before 6.7).
+    QString base = qEnvironmentVariable("XDG_STATE_HOME");
+    if (base.isEmpty() || !QDir::isAbsolutePath(base)) base = QDir::homePath() + "/.local/state";
+    if (QStandardPaths::isTestModeEnabled()) base = QDir::homePath() + "/.qttest/state";
+    return base + "/" + QCoreApplication::organizationName();
+}
+QString logDir() { return stateDir(); }
 QString logFile() { return logDir() + "/gimbot.log"; }
 
 void install()
 {
     QDir().mkpath(logDir());
+    // Logs used to live in ~/.local/share/gimbot/logs; move them over once.
+    const QString old = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/" +
+                        QCoreApplication::organizationName() + "/logs";
+    if (QDir(old).exists()) {
+        for (const QString &f : QDir(old).entryList(QDir::Files))
+            if (!QFile::exists(logDir() + "/" + f)) QFile::rename(old + "/" + f, logDir() + "/" + f);
+        QDir(old).removeRecursively();
+    }
     g_file = new QFile(logFile());
     g_file->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
     qInstallMessageHandler(handler);

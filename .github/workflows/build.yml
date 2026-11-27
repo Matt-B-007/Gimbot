@@ -1,6 +1,6 @@
-# Builds and tests Gimbot on Arch Linux (the base CachyOS uses) for every
-# push and pull request. OBSBOT's SDK is not public, so CI builds the
-# simulated-camera version and checks that every screen loads.
+# Checks Gimbot on Arch Linux (the base CachyOS uses) for every push and pull
+# request. All checks live in scripts/check.sh, so a local run and this one
+# are the same. OBSBOT's SDK isn't public, so CI builds the simulated camera.
 name: Build
 
 on:
@@ -8,30 +8,25 @@ on:
   pull_request:
 
 jobs:
-  arch:
+  check:
+    name: Checks (scripts/check.sh)
     runs-on: ubuntu-latest
+    # Arch is a rolling release, so Qt here is always the newest; tools whose
+    # findings can change (shellcheck, actionlint) are pinned below.
     container: archlinux:latest
     steps:
-      - name: Install dependencies
+      - name: Install build tools and pinned checkers
         run: |
-          pacman -Syu --noconfirm --needed base-devel cmake extra-cmake-modules git dbus \
+          pacman -Syu --noconfirm --needed base-devel cmake extra-cmake-modules git dbus python-pip \
             qt6-base qt6-declarative qt6-multimedia qt6-multimedia-ffmpeg qt6-svg \
             kcoreaddons kcrash kglobalaccel kstatusnotifieritem
-      - uses: actions/checkout@v4
-      - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
-      - name: Build
-        run: cmake --build build -j"$(nproc)"
-      - name: Unit tests
-        run: ctest --test-dir build --output-on-failure
-      - name: Screens load without QML errors
-        env:
-          QT_QPA_PLATFORM: offscreen
-          QT_QUICK_BACKEND: software
-        run: |
-          ./build/gimbot --fake --screenshots shots 2>&1 | tee run.log
-          ! grep -E " W qrc:| E " run.log
-      - uses: actions/upload-artifact@v4
+          pip install --break-system-packages shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25
+      - uses: actions/checkout@v5
+      - name: Run every check (bash scripts/check.sh)
+        run: bash scripts/check.sh
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: screenshots
-          path: shots/
+          path: build-check/shots/

@@ -12,6 +12,8 @@ Rectangle {
     signal openReport()
     signal openAbout()
     signal confirmFactoryReset()
+    signal confirmGoBack()
+    signal toast(string message)
     signal saveProfileRequested()
     signal openUpdate()
     signal openTour()
@@ -671,7 +673,8 @@ Rectangle {
                             label: qsTr("Tell me about new versions")
                             description: !updater.configured ? qsTr("Not available in this build")
                                         : root.v.updateChannel === 2 ? qsTr("Includes beta versions, which may have bugs. Switching back offers the newest normal version.")
-                                        : updater.canInstall ? qsTr("Gimbot installs updates for you with one click")
+                                        : updater.installType === "aur" ? qsTr("Installed from the AUR, so it updates with your AUR helper")
+                                        : updater.canInstall ? qsTr("Gimbot installs signed updates for you with one click")
                                         : qsTr("Update with your package manager")
                             Segmented {
                                 implicitWidth: 260
@@ -722,6 +725,29 @@ Rectangle {
                                 enabled: updater.state !== "checking" && !(updater.state === "error" && updater.retryIn > 0)
                                 tip: updater.retryIn > 0 ? qsTr("Waiting a moment before asking GitHub again") : ""
                                 onClicked: updater.check()
+                            }
+                        }
+                        SettingRow { // AUR installs update through the AUR helper
+                            visible: updater.installType === "aur"
+                            label: qsTr("Update from the AUR")
+                            description: qsTr("Run this in a terminal: %1").arg(updater.aurCommand)
+                            Btn {
+                                text: qsTr("Copy command")
+                                iconName: "copy"
+                                compact: true
+                                onClicked: { platform.copyToClipboard(updater.aurCommand); root.toast(qsTr("Copied")) }
+                            }
+                        }
+                        SettingRow {
+                            visible: updater.canInstall && updater.previousVersion.length > 0
+                            label: qsTr("Go back to Gimbot %1").arg(updater.previousVersion)
+                            description: qsTr("Reinstall the version you had before the last update, if this one misbehaves. Your settings stay.")
+                            Btn {
+                                text: qsTr("Go back…")
+                                iconName: "undo"
+                                compact: true
+                                enabled: updater.installState !== "running"
+                                onClicked: root.confirmGoBack()
                             }
                         }
 

@@ -4,6 +4,7 @@
 #include <QVideoFrameFormat>
 
 #include "controller.hpp"
+#include "crashlog.hpp"
 #include "logger.hpp"
 #include "updater.hpp"
 
@@ -356,6 +357,10 @@ QString Platform::diagnostics(bool includeSerial) const
                    .arg(v.value("asleep").toBool() ? "asleep" : "awake");
     } else {
         out << QStringLiteral("Camera: not connected%1").arg(m_cam->usbAvailable() ? "" : " (no USB bus found)");
+    }
+    if (m_crashed) {
+        const QString crash = CrashLog::latest();
+        if (!crash.isEmpty()) out << QString() << QStringLiteral("Last crash:") << crash.left(4000).trimmed();
     }
     out << QString() << QStringLiteral("Recent log:");
     out << Logger::recent(80);

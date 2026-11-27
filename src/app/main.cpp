@@ -1,6 +1,8 @@
 // Gimbot: an unofficial Linux control app for OBSBOT cameras.
 #include "controller.hpp"
+#include "crashlog.hpp"
 #include "logger.hpp"
+#include "selftest.hpp"
 #include "platform.hpp"
 #include "updater.hpp"
 
@@ -64,6 +66,9 @@ static void quitOnSignals(QCoreApplication &app)
 
 int main(int argc, char *argv[])
 {
+    // gimbot --self-test [--quick]: off-screen, temporary folders, then exit.
+    if (selftest::requested(argc, argv)) return selftest::run(argc, argv);
+
     QApplication app(argc, argv);
     QApplication::setOrganizationName(QStringLiteral("gimbot"));
     QApplication::setApplicationName(QStringLiteral("gimbot"));
@@ -96,7 +101,9 @@ int main(int argc, char *argv[])
     QCommandLineOption hidden("hidden", "Start in the tray without opening the window.");
     QCommandLineOption fake("fake", "Use a simulated camera (also GIMBOT_FAKE_CAMERA=1).");
     QCommandLineOption shots("screenshots", "Save screenshots of each screen to DIR and quit (for testing).", "DIR");
-    parser.addOptions({hidden, fake, shots});
+    QCommandLineOption selfTest("self-test", "Check that Gimbot works, then exit (add --quick for the short check).");
+    QCommandLineOption quick("quick", "With --self-test: only start, load the interface and read settings.");
+    parser.addOptions({hidden, fake, shots, selfTest, quick});
     parser.process(app);
     const bool screenshotMode = parser.isSet(shots);
     if (screenshotMode) // keep test runs from touching the user's real settings
@@ -111,6 +118,7 @@ int main(int argc, char *argv[])
 
     Logger::install();
     qInfo() << "Gimbot" << GIMBOT_VERSION << "starting, Qt" << qVersion();
+    if (!screenshotMode) CrashLog::install();
 
     // Use our own fully styled controls everywhere, so the app looks the
     // same in every theme; colors still follow the system palette.

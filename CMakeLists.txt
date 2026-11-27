@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 project(gimbot VERSION 0.1.0 LANGUAGES CXX)
 # The full version, including any pre-release part. project() only accepts
 # numbers, so this is what the app, the installer and the package use.
-set(GIMBOT_VERSION "0.1.0-beta.9")
+set(GIMBOT_VERSION "0.1.0-beta.10")
 if(NOT GIMBOT_VERSION MATCHES "^${PROJECT_VERSION}(-[0-9A-Za-z.]+)?$")
     message(FATAL_ERROR "GIMBOT_VERSION (${GIMBOT_VERSION}) must start with the project version (${PROJECT_VERSION})")
 endif()
@@ -179,7 +179,10 @@ if(BUILD_GUI)
         src/app/logger.cpp src/app/logger.hpp
         src/app/updater.cpp src/app/updater.hpp
         src/app/platform.cpp src/app/platform.hpp
-        src/app/previewformat.cpp src/app/previewformat.hpp)
+        src/app/previewformat.cpp src/app/previewformat.hpp
+        src/app/settingsstore.cpp src/app/settingsstore.hpp
+        src/app/crashlog.cpp src/app/crashlog.hpp
+        src/app/selftest.cpp src/app/selftest.hpp)
 
     set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
     # Place every QML file and asset at the module's root (not under qml/),
@@ -218,7 +221,11 @@ if(BUILD_GUI)
         GIMBOT_VERSION="${GIMBOT_VERSION}"
         GIMBOT_SDK_VERSION="${GIMBOT_SDK_VERSION}"
         GIMBOT_REPO="${GIMBOT_REPO}"
-        GIMBOT_KDE_STATUS="${GIMBOT_KDE_STATUS}")
+        GIMBOT_KDE_STATUS="${GIMBOT_KDE_STATUS}"
+        GIMBOT_LIBDIR="${CMAKE_INSTALL_FULL_LIBDIR}")
+    if(GIMBOT_HAVE_SDK)
+        target_compile_definitions(gimbot PRIVATE GIMBOT_HAVE_SDK)
+    endif()
     target_compile_options(gimbot PRIVATE -Wall -Wextra -Wno-unused-parameter)
     if(GIMBOT_HAVE_KF6)
         target_link_libraries(gimbot PRIVATE KF6::CoreAddons KF6::Crash KF6::GlobalAccel KF6::StatusNotifierItem)
@@ -238,14 +245,15 @@ endif()
 include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 ${GIMBOT_MIN_QT} REQUIRED COMPONENTS Test)
-    add_executable(gimbot_tests tests/test_core.cpp src/app/updater.cpp src/app/previewformat.cpp)
+    add_executable(gimbot_tests tests/test_core.cpp src/app/updater.cpp src/app/previewformat.cpp
+        src/app/settingsstore.cpp)
     target_include_directories(gimbot_tests PRIVATE src/app)
     target_link_libraries(gimbot_tests PRIVATE gimbotcore Qt6::Core Qt6::Network Qt6::Test)
     add_test(NAME gimbot_tests COMMAND gimbot_tests)
     add_test(NAME web_addresses COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_urls.sh ${CMAKE_CURRENT_SOURCE_DIR})
     if(BUILD_GUI)
         add_executable(gimbot_controller_tests tests/test_controller.cpp
-            src/app/controller.cpp src/app/worker.cpp src/app/logger.cpp)
+            src/app/controller.cpp src/app/worker.cpp src/app/logger.cpp src/app/settingsstore.cpp)
         target_include_directories(gimbot_controller_tests PRIVATE src/app)
         target_link_libraries(gimbot_controller_tests PRIVATE gimbotcore Qt6::Core Qt6::Gui Qt6::Test)
         set_target_properties(gimbot_controller_tests PROPERTIES AUTOMOC ON)

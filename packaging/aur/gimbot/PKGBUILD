@@ -46,4 +46,7 @@ check() {
 package() {
   DESTDIR="$pkgdir" cmake --install build
   install -Dm644 "Gimbot-$pkgver/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  # Tells the app it came from the AUR, so it shows the paru command instead of updating itself.
+  install -dm755 "$pkgdir/usr/lib/gimbot"
+  echo aur > "$pkgdir/usr/lib/gimbot/install-type"
 }
