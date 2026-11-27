@@ -11,7 +11,10 @@ Worker::Worker(QObject *parent) : QObject(parent), m_ctx(new QObject)
     m_thread.start();
 }
 
-Worker::~Worker() { stop(); }
+Worker::~Worker()
+{
+    stop();
+}
 
 void Worker::stop()
 {

@@ -12,8 +12,10 @@ bash scripts/check.sh
 
 runs exactly what CI runs, in the same order: shell scripts (`bash -n` +
 shellcheck at every severity), workflow files (actionlint), web addresses,
-version numbers agreeing, a licence header in every source file, the build
-with warnings as errors, unit, controller and UI tests, `gimbot --self-test`,
+version numbers agreeing, a licence header in every source file, C++
+formatting (clang-format, style in `.clang-format`), the build with warnings
+as errors, QML lint (qmllint, settings in `.qmllint.ini`, any warning fails),
+unit, controller and UI tests, `gimbot --self-test`,
 a Release build and its self-test, the installer's self-test, and loading
 every screen.
 The tests include theme contrast (every text color 4.5:1 in both themes),
@@ -25,9 +27,15 @@ with the `sudo pacman -S --needed …` command and exits with code **3**
 without checking anything. A failed check exits with **1**, a pass with
 **0**. Colors appear only in a terminal, and never when `NO_COLOR` is set.
 
-CI pins shellcheck 0.11.0 and actionlint 1.7.12
-(`pip install shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25`). Other
-versions on your PC only print a note.
+CI pins shellcheck 0.11.0, actionlint 1.7.12 and clang-format 23.1.5 (the
+version Arch ships): `pip install shellcheck-py==0.11.0.1
+actionlint-py==1.7.12.25 clang-format==23.1.5`. Other shellcheck and
+actionlint versions on your PC only print a note. A different clang-format
+*major* version skips the formatting step with a note (formatting can differ
+between major versions); CI always checks it. qmllint comes with Qt, so it's
+the same as your system's (`qt6-declarative`).
+
+To fix formatting: `clang-format -i src/*/*.cpp src/*/*.hpp tests/*.cpp`.
 
 ## Build from source
 

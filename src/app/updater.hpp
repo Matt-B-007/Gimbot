@@ -8,15 +8,16 @@
 // password prompt. Progress comes back as "::progress N message" lines.
 #pragma once
 
-#include <QNetworkAccessManager>
 #include <QJsonObject>
+#include <QNetworkAccessManager>
 #include <QObject>
 #include <QProcess>
 #include <QTimer>
 
 #include <functional>
 
-class Updater : public QObject {
+class Updater : public QObject
+{
     Q_OBJECT
     Q_PROPERTY(bool configured READ configured CONSTANT)
     Q_PROPERTY(QString state READ state NOTIFY changed) // idle checking upToDate available error off
@@ -100,10 +101,10 @@ public:
 
     // Which version to offer, from the signed releases in the releases list.
     struct Choice {
-        bool valid = false;     // the releases answer made sense
-        QString version;        // empty: nothing to offer
-        QString tag;            // release tag
-        QJsonObject release;    // the chosen release, if any
+        bool valid = false;  // the releases answer made sense
+        QString version;     // empty: nothing to offer
+        QString tag;         // release tag
+        QJsonObject release; // the chosen release, if any
         bool beta = false, isSwitch = false;
     };
     static Choice choose(const QByteArray &releasesJson, const QString &current, int channel);
@@ -139,13 +140,13 @@ private:
     bool m_beta = false, m_switch = false, m_simulated = false;
     QString m_checkError;
     bool m_dnsFallback = false;
-    bool m_manual = false;      // the check in progress was asked for
-    qint64 m_lastAttempt = 0;   // ms since epoch
-    int m_failures = 0;         // in a row, for backing off
+    bool m_manual = false;    // the check in progress was asked for
+    qint64 m_lastAttempt = 0; // ms since epoch
+    int m_failures = 0;       // in a row, for backing off
     QTimer m_retry;
-    QTimer m_cooldown;          // ticks retryIn down once a second
+    QTimer m_cooldown; // ticks retryIn down once a second
     int m_retryIn = 0;
-    int m_curlExit = 0;         // last backup lookup's curl exit code
+    int m_curlExit = 0; // last backup lookup's curl exit code
 
     QProcess *m_proc = nullptr;
     QString m_installState = "idle", m_status, m_error, m_log, m_action = "update";

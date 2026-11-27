@@ -30,7 +30,8 @@ Rectangle {
     property bool active: false
     readonly property bool focusInside: {
         const f = root.Window.activeFocusItem
-        if (!f || f.visualFocus !== true) return false
+        // Only controls have visualFocus, so qmllint can't check it on any item.
+        if (!f || f.visualFocus !== true) return false // qmllint disable missing-property
         for (let i = f; i; i = i.parent) if (i === root) return true
         return false
     }
@@ -126,14 +127,15 @@ Rectangle {
         }
 
         AbstractButtonLike { // More / Less
+            id: moreButton
             visible: root.moreKey.length > 0
             Layout.fillWidth: true
             implicitHeight: 30
             corner: Theme.radiusSm
             background: Rectangle {
                 radius: Theme.radiusSm
-                color: parent.hovered ? Theme.hover : "transparent"
-                border.width: parent.visualFocus ? 2 : 0
+                color: moreButton.hovered ? Theme.hover : "transparent"
+                border.width: moreButton.visualFocus ? 2 : 0
                 border.color: Theme.accent
             }
             Accessible.name: root.expanded ? qsTr("Show fewer %1 settings").arg(root.title) : qsTr("Show more %1 settings").arg(root.title)

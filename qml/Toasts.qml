@@ -12,15 +12,15 @@ Item {
     function show(message, kind, actionText, action) {
         const id = nextId++
         if (action) actions[id] = action
-        model.append({ message: message, kind: kind || "info", actionText: actionText || "", tid: id })
-        if (model.count > 3) forget(0)
+        toastModel.append({ message: message, kind: kind || "info", actionText: actionText || "", tid: id })
+        if (toastModel.count > 3) forget(0)
     }
     function forget(i) {
-        delete actions[model.get(i).tid]
-        model.remove(i)
+        delete actions[toastModel.get(i).tid]
+        toastModel.remove(i)
     }
 
-    ListModel { id: model }
+    ListModel { id: toastModel }
 
     Column {
         anchors.horizontalCenter: parent.horizontalCenter
@@ -28,7 +28,7 @@ Item {
         anchors.bottomMargin: 24
         spacing: 8
         Repeater {
-            model: model
+            model: toastModel
             delegate: Rectangle {
                 id: toast
                 required property int index
@@ -90,8 +90,8 @@ Item {
                     id: remove
                     interval: Theme.normal + 50
                     onTriggered: {
-                        for (let i = 0; i < model.count; ++i)
-                            if (model.get(i).tid === toast.tid) { root.forget(i); break }
+                        for (let i = 0; i < toastModel.count; ++i)
+                            if (toastModel.get(i).tid === toast.tid) { root.forget(i); break }
                     }
                 }
             }

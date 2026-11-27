@@ -6,14 +6,15 @@
 #include "previewformat.hpp"
 #include "settingsstore.hpp"
 
+#include "updater.hpp"
 #include <QDir>
 #include <QSettings>
 #include <QTemporaryDir>
-#include "updater.hpp"
 
 #include <QtTest>
 
-class CoreTest : public QObject {
+class CoreTest : public QObject
+{
     Q_OBJECT
 
     int run(t2::Camera &cam, std::vector<std::string> args, std::string *out = nullptr)
@@ -189,17 +190,21 @@ private slots:
     static QByteArray release(const char *tag, bool pre, bool signedAssets = true, bool draft = false)
     {
         const QString v = QString::fromLatin1(tag).mid(1);
-        const QString assets = signedAssets
-            ? QStringLiteral(R"([{"name":"Gimbot-%1-source.tar.gz"},{"name":"SHA256SUMS"},{"name":"SHA256SUMS.minisig"}])").arg(v)
-            : QStringLiteral(R"([{"name":"Gimbot-%1-source.zip"}])").arg(v);
+        const QString assets =
+            signedAssets
+                ? QStringLiteral(
+                      R"([{"name":"Gimbot-%1-source.tar.gz"},{"name":"SHA256SUMS"},{"name":"SHA256SUMS.minisig"}])")
+                      .arg(v)
+                : QStringLiteral(R"([{"name":"Gimbot-%1-source.zip"}])").arg(v);
         return QStringLiteral(R"({"tag_name":"%1","prerelease":%2,"draft":%3,"body":"notes %1","assets":%4})")
-            .arg(QString::fromLatin1(tag), pre ? "true" : "false", draft ? "true" : "false", assets).toUtf8();
+            .arg(QString::fromLatin1(tag), pre ? "true" : "false", draft ? "true" : "false", assets)
+            .toUtf8();
     }
 
     void updateChoice()
     {
-        const QByteArray rel = "[" + release("v0.1.0-beta.11", true) + "," + release("v0.1.0-beta.12", true, false) + "," +
-                               release("v0.0.9", false) + "," + release("v9.9.9", false, true, true) + "]";
+        const QByteArray rel = "[" + release("v0.1.0-beta.11", true) + "," + release("v0.1.0-beta.12", true, false) +
+                               "," + release("v0.0.9", false) + "," + release("v9.9.9", false, true, true) + "]";
         // Beta channel: the newest SIGNED release (beta.12 has no signature yet).
         auto c = Updater::choose(rel, "0.1.0-beta.10", 2);
         QVERIFY(c.valid);
@@ -225,11 +230,13 @@ private slots:
 
     void changelogNotes()
     {
-        const QByteArray log = "# Changelog\n\n## 0.1.0-beta.8 (2026-11-26)\n- New thing\n- Fix\n\n## 0.1.0-beta.7\n- Older\n";
+        const QByteArray log =
+            "# Changelog\n\n## 0.1.0-beta.8 (2026-11-26)\n- New thing\n- Fix\n\n## 0.1.0-beta.7\n- Older\n";
         QCOMPARE(Updater::changelogSection(log, "0.1.0-beta.8"), QString("- New thing\n- Fix"));
         QCOMPARE(Updater::changelogSection(log, "0.1.0-beta.7"), QString("- Older"));
         QCOMPARE(Updater::changelogSection(log, "0.2.0"), QString());
-        QCOMPARE(Updater::changelogSection("## 0.1.0-beta.10\n- ten\n## 0.1.0-beta.1\n- one\n", "0.1.0-beta.1"), QString("- one"));
+        QCOMPARE(Updater::changelogSection("## 0.1.0-beta.10\n- ten\n## 0.1.0-beta.1\n- one\n", "0.1.0-beta.1"),
+                 QString("- one"));
     }
 
     void settingsMigration()
@@ -275,10 +282,13 @@ private slots:
         const QString file = dir.filePath("gimbot.conf");
         const QString backups = dir.filePath("backups");
         QVERIFY(!settingsstore::backup(file, backups)); // nothing to back up yet
-        { QSettings s(file, QSettings::IniFormat); s.setValue("a", 1); }
+        {
+            QSettings s(file, QSettings::IniFormat);
+            s.setValue("a", 1);
+        }
         QVERIFY(settingsstore::backup(file, backups));
-        QVERIFY(!settingsstore::backup(file, backups));  // within 15 minutes
-        for (int i = 0; i < 7; ++i) {                    // interval 0: keeps only 5
+        QVERIFY(!settingsstore::backup(file, backups)); // within 15 minutes
+        for (int i = 0; i < 7; ++i) {                   // interval 0: keeps only 5
             QTest::qWait(5);
             QVERIFY(settingsstore::backup(file, backups, 0, 5));
         }
@@ -292,9 +302,9 @@ private slots:
                                       {1920, 1080, 30, true},  {1920, 1080, 5, false}, {3840, 2160, 30, true},
                                       {3840, 2160, 15, false}, {1920, 1080, 60, true}};
         // Auto: the smallest smooth format that covers the preview, never below 720p.
-        QCOMPARE(preview::choose(tiny2, 400, 0), 1);   // 720p30
-        QCOMPARE(preview::choose(tiny2, 900, 0), 7);   // 1080p60 beats 1080p30
-        QCOMPARE(preview::choose(tiny2, 1500, 0), 7);  // Auto stops at 1080p (60 fps), never 4K
+        QCOMPARE(preview::choose(tiny2, 400, 0), 1);  // 720p30
+        QCOMPARE(preview::choose(tiny2, 900, 0), 7);  // 1080p60 beats 1080p30
+        QCOMPARE(preview::choose(tiny2, 1500, 0), 7); // Auto stops at 1080p (60 fps), never 4K
         QCOMPARE(preview::choose(tiny2, 5000, 0), 7);
         QCOMPARE(preview::choose({{1280, 720, 30, true}}, 1500, 0), 0); // nothing bigger: what there is
         // Fixed choices skip slow raw modes.

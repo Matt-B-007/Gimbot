@@ -4,11 +4,16 @@
 # 1. If a Gimbot zip was uploaded to the top of the repository, unpack it over
 #    the files (except .github/workflows, which this job isn't allowed to
 #    change), delete the zip and commit.
-# 2. If the version in CMakeLists.txt has no release yet: run every check
-#    (scripts/check.sh), make the source tarball, SHA256SUMS and its minisign
-#    signature, create a DRAFT release with them, verify, then publish.
-#    Anything failing stops before publishing ("fails closed"); a draft left
-#    behind by a failure is deleted, and the log says so.
+# 2. If the version in CMakeLists.txt has no signed release yet: run every
+#    check (scripts/check.sh), make the source tarball, SHA256SUMS and its
+#    minisign signature, and verify them. Then either
+#    - no release yet: create a DRAFT release with them, check, then publish
+#      ("fails closed"; a draft left behind by a failure is deleted), or
+#    - a release already exists without a signature (StowLock makes one when
+#      it uploads): attach the files to it, the signature last. Until the
+#      signature is there, installers treat the release as not available
+#      yet; if attaching fails, the files already attached are removed.
+#    A release that already has SHA256SUMS.minisig is left alone.
 name: Publish
 
 on:
@@ -29,13 +34,13 @@ jobs:
     runs-on: ubuntu-latest
     container: archlinux:latest
     steps:
-      - name: Install build tools, signing tool and pinned checkers
+      - name: Install build tools, signing tool and pinned checkers (shellcheck, actionlint, clang-format)
         run: |
           pacman -Syu --noconfirm --needed base-devel cmake extra-cmake-modules git dbus python-pip \
             qt6-base qt6-declarative qt6-multimedia qt6-multimedia-ffmpeg qt6-svg \
             kcoreaddons kcrash kglobalaccel kstatusnotifieritem \
             minisign github-cli unzip zip
-          pip install --break-system-packages shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25
+          pip install --break-system-packages shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25 clang-format==23.1.5
 
       - uses: actions/checkout@v7
         with:
@@ -88,12 +93,26 @@ jobs:
           version="$(sed -nE 's/^set\(GIMBOT_VERSION "([^"]+)".*/\1/p' CMakeLists.txt | head -n1)"
           if [[ -z "$version" ]]; then echo "::error::No GIMBOT_VERSION in CMakeLists.txt"; exit 1; fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          if gh release view "v$version" >/dev/null 2>&1; then
-            echo "v$version is already released; nothing to publish."
-            echo "new=false" >> "$GITHUB_OUTPUT"
+          # new:    no release yet, so make one
+          # attach: a release exists (e.g. made by StowLock) without a signature
+          # signed: already signed, nothing to do
+          if assets="$(gh release view "v$version" --json assets --jq '.assets[].name' 2>err.txt)"; then
+            if grep -qx "SHA256SUMS.minisig" <<< "$assets"; then
+              echo "v$version is already released and signed; nothing to publish."
+              mode=signed
+            else
+              echo "v$version exists but isn't signed yet; its files will be added."
+              mode=attach
+            fi
+          elif grep -qi "not found" err.txt; then
+            mode=new
           else
-            echo "new=true" >> "$GITHUB_OUTPUT"
+            echo "::error::Couldn't look up release v$version: $(cat err.txt)"
+            exit 1
           fi
+          rm -f err.txt
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          if [[ "$mode" == signed ]]; then echo "new=false" >> "$GITHUB_OUTPUT"; else echo "new=true" >> "$GITHUB_OUTPUT"; fi
 
       - name: Signing key is set up (MINISIGN_SECRET_KEY)
         if: steps.version.outputs.new == 'true'
@@ -186,7 +205,7 @@ jobs:
           subject-path: dist/*
 
       - name: Create a draft release, upload, verify, publish
-        if: steps.version.outputs.new == 'true'
+        if: steps.version.outputs.mode == 'new'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -205,6 +224,52 @@ jobs:
           gh release edit "$tag" --draft=false
           echo "draft=" >> "$GITHUB_ENV"
           echo "Published $tag."
+
+      - name: Add the files to the existing release, signature last
+        if: steps.version.outputs.mode == 'attach'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          tag="v$VERSION"
+          # The release should point at what was just checked; say so if not.
+          if tagged="$(git rev-list -n 1 "$tag" 2>/dev/null)" && [[ "$tagged" != "$(git rev-parse HEAD)" ]]; then
+            echo "::warning::$tag points at ${tagged:0:7}, not at ${GITHUB_SHA:0:7}. The signed files are made from ${GITHUB_SHA:0:7} (what was just checked); installers use those files."
+          fi
+          # Everything except the signature first, then the signature: until
+          # it's attached, installers and Update now skip this release.
+          others=()
+          for f in dist/*; do
+            if [[ "$(basename "$f")" != SHA256SUMS.minisig ]]; then others+=("$f"); fi
+          done
+          echo "attached=${others[*]##*/}" >> "$GITHUB_ENV"
+          gh release upload "$tag" --clobber "${others[@]}"
+          for f in "${others[@]}"; do
+            if ! gh release view "$tag" --json assets --jq '.assets[].name' | grep -qx "$(basename "$f")"; then
+              echo "::error::$(basename "$f") didn't upload"
+              exit 1
+            fi
+          done
+          echo "attached=${others[*]##*/} SHA256SUMS.minisig" >> "$GITHUB_ENV"
+          gh release upload "$tag" --clobber dist/SHA256SUMS.minisig
+          if ! gh release view "$tag" --json assets --jq '.assets[].name' | grep -qx SHA256SUMS.minisig; then
+            echo "::error::SHA256SUMS.minisig didn't upload"
+            exit 1
+          fi
+          gh release edit "$tag" --title "Gimbot $VERSION" --notes-file notes.md
+          echo "attached=" >> "$GITHUB_ENV"
+          echo "Signed files added to $tag."
+
+      - name: Remove half-attached files if adding them failed
+        if: failure() && env.attached != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          echo "Adding files failed; removing the ones already attached to v$VERSION so the release stays unsigned and skipped."
+          for name in ${attached}; do
+            gh release delete-asset "v$VERSION" "$name" --yes || echo "::warning::Couldn't remove $name from v$VERSION; delete it on the Releases page."
+          done
 
       - name: Remove the draft if publishing failed
         if: failure() && env.draft != ''

@@ -55,7 +55,7 @@ QtObject {
     readonly property color overlay: Qt.rgba(0.047, 0.063, 0.086, 0.8) // chips on top of video
     readonly property color scrim: Qt.rgba(0.02, 0.03, 0.05, dark ? 0.6 : 0.35)
 
-    readonly property string font: interLoader.status === FontLoader.Ready ? "Inter" : Qt.application.font.family
+    readonly property string font: interLoader.status === FontLoader.Ready ? "Inter" : Qt.application.font.family // qmllint disable missing-property
     readonly property int fontSize: 14
     readonly property int small: 12
     readonly property int large: 16

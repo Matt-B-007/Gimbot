@@ -24,9 +24,12 @@ namespace {
 constexpr int kHoldMs = 1500; // ignore camera echoes this long after a local change
 
 // White balance choices shown in the app, in order.
-constexpr int kWbCodes[] = {t2::wb::Auto, t2::wb::Daylight, t2::wb::Cloudy, t2::wb::Tungsten, t2::wb::Fluorescent,
-                            t2::wb::Manual};
-int wbCode(int index) { return kWbCodes[std::clamp(index, 0, 5)]; }
+constexpr int kWbCodes[] = {t2::wb::Auto,     t2::wb::Daylight,    t2::wb::Cloudy,
+                            t2::wb::Tungsten, t2::wb::Fluorescent, t2::wb::Manual};
+int wbCode(int index)
+{
+    return kWbCodes[std::clamp(index, 0, 5)];
+}
 int wbIndex(int code)
 {
     for (int i = 0; i < 6; ++i)
@@ -35,11 +38,15 @@ int wbIndex(int code)
 }
 
 // Startup tracking choices shown in the app, in order.
-struct BootChoice { t2::Mode mode; t2::Framing framing; };
-constexpr BootChoice kBoot[] = {{t2::Mode::Off, t2::Framing::UpperBody},       {t2::Mode::Person, t2::Framing::UpperBody},
-                                {t2::Mode::Person, t2::Framing::FullBody},     {t2::Mode::Person, t2::Framing::CloseUp},
-                                {t2::Mode::Group, t2::Framing::UpperBody},     {t2::Mode::Hand, t2::Framing::UpperBody},
-                                {t2::Mode::Desk, t2::Framing::UpperBody},      {t2::Mode::Whiteboard, t2::Framing::UpperBody}};
+struct BootChoice {
+    t2::Mode mode;
+    t2::Framing framing;
+};
+constexpr BootChoice kBoot[] = {
+    {t2::Mode::Off, t2::Framing::UpperBody},   {t2::Mode::Person, t2::Framing::UpperBody},
+    {t2::Mode::Person, t2::Framing::FullBody}, {t2::Mode::Person, t2::Framing::CloseUp},
+    {t2::Mode::Group, t2::Framing::UpperBody}, {t2::Mode::Hand, t2::Framing::UpperBody},
+    {t2::Mode::Desk, t2::Framing::UpperBody},  {t2::Mode::Whiteboard, t2::Framing::UpperBody}};
 int bootIndexFromMode(int mode)
 {
     switch (static_cast<t2::Mode>(mode)) {
@@ -89,12 +96,11 @@ QVariantMap statusToMap(const t2::Status &s)
 }
 
 // Settings captured by a profile.
-const QStringList kProfileKeys = {"mode",        "framing",      "zoom",        "hdr",          "fov",
-                                  "mirrored",    "autoFocus",    "faceFocus",   "manualFocus",  "faceExposure",
-                                  "antiFlicker", "brightness",   "contrast",    "saturation",   "sharpness",
-                                  "hue",         "wbMode",       "wbKelvin",    "exposureAuto", "shutter",
-                                  "trackStyle",  "autoZoom",     "zoneEnabled", "zoneYawMin",   "zoneYawMax",
-                                  "zonePitchMin", "zonePitchMax", "zoneAutoSelect"};
+const QStringList kProfileKeys = {
+    "mode",      "framing",     "zoom",         "hdr",         "fov",          "mirrored",     "autoFocus",
+    "faceFocus", "manualFocus", "faceExposure", "antiFlicker", "brightness",   "contrast",     "saturation",
+    "sharpness", "hue",         "wbMode",       "wbKelvin",    "exposureAuto", "shutter",      "trackStyle",
+    "autoZoom",  "zoneEnabled", "zoneYawMin",   "zoneYawMax",  "zonePitchMin", "zonePitchMax", "zoneAutoSelect"};
 
 // Setting one key implies another (e.g. moving the focus slider means manual focus).
 const QHash<QString, QPair<QString, QVariant>> kImplies = {{"framing", {"mode", 2}},
@@ -167,14 +173,14 @@ void Controller::defineSettings()
     def("mode", Kind::Status, 2, tr("tracking"), [=](Camera &c, V v) {
         return c.setMode(static_cast<t2::Mode>(i(v, "mode")), static_cast<t2::Framing>(i(v, "framing")));
     });
-    def("framing", Kind::Status, 1, tr("framing"), [=](Camera &c, V v) {
-        return c.setMode(t2::Mode::Person, static_cast<t2::Framing>(i(v, "framing")));
-    });
+    def("framing", Kind::Status, 1, tr("framing"),
+        [=](Camera &c, V v) { return c.setMode(t2::Mode::Person, static_cast<t2::Framing>(i(v, "framing"))); });
     def("zoom", Kind::Status, 0, tr("zoom"), [=](Camera &c, V v) { return c.setZoom(i(v, "zoom")); });
     def("hdr", Kind::Status, false, tr("HDR"), [=](Camera &c, V v) { return c.setHdr(b(v, "hdr")); });
     def("fov", Kind::Status, 0, tr("field of view"),
         [=](Camera &c, V v) { return c.setFov(static_cast<t2::Fov>(i(v, "fov"))); });
-    def("mirrored", Kind::Status, false, tr("mirroring"), [=](Camera &c, V v) { return c.setMirror(b(v, "mirrored")); });
+    def("mirrored", Kind::Status, false, tr("mirroring"),
+        [=](Camera &c, V v) { return c.setMirror(b(v, "mirrored")); });
     def("autoFocus", Kind::Status, true, tr("focus"), [=](Camera &c, V v) {
         return b(v, "autoFocus") ? c.setAutoFocus(true) : c.setManualFocus(i(v, "manualFocus"));
     });
@@ -188,16 +194,14 @@ void Controller::defineSettings()
         [=](Camera &c, V v) { return c.setAntiFlicker(i(v, "antiFlicker")); });
     def("micDuringSleep", Kind::Status, false, tr("microphone during sleep"),
         [=](Camera &c, V v) { return c.setMicDuringSleep(b(v, "micDuringSleep")); });
-    def("voiceLanguage", Kind::Status, 1, tr("voice language"), [=](Camera &c, V v) {
-        return c.setVoiceLanguage(static_cast<t2::VoiceLanguage>(i(v, "voiceLanguage")));
-    });
+    def("voiceLanguage", Kind::Status, 1, tr("voice language"),
+        [=](Camera &c, V v) { return c.setVoiceLanguage(static_cast<t2::VoiceLanguage>(i(v, "voiceLanguage"))); });
     def("audioAutoGain", Kind::Status, true, tr("automatic mic volume"),
         [=](Camera &c, V v) { return c.setAudioAutoGain(b(v, "audioAutoGain")); });
     for (int n = 0; n < static_cast<int>(t2::Voice::Count); ++n) {
         const QString key = QStringLiteral("voice%1").arg(n);
-        def(key, Kind::Status, true, tr("voice commands"), [n, key](Camera &c, V v) {
-            return c.setVoiceCommand(static_cast<t2::Voice>(n), v.value(key).toBool());
-        });
+        def(key, Kind::Status, true, tr("voice commands"),
+            [n, key](Camera &c, V v) { return c.setVoiceCommand(static_cast<t2::Voice>(n), v.value(key).toBool()); });
     }
 
     // Read from the camera when it connects.
@@ -236,7 +240,8 @@ void Controller::defineSettings()
     // camera can't report these back).
     def("trackStyle", Kind::Pushed, 0, tr("tracking style"),
         [=](Camera &c, V v) { return c.setTrackStyle(static_cast<t2::TrackStyle>(i(v, "trackStyle"))); });
-    def("autoZoom", Kind::Pushed, true, tr("auto zoom"), [=](Camera &c, V v) { return c.setAutoZoom(b(v, "autoZoom")); });
+    def("autoZoom", Kind::Pushed, true, tr("auto zoom"),
+        [=](Camera &c, V v) { return c.setAutoZoom(b(v, "autoZoom")); });
     def("gestureSelect", Kind::Pushed, true, tr("gestures"),
         [=](Camera &c, V v) { return c.setGesture(0, b(v, "gestureSelect")); });
     def("gestureZoom", Kind::Pushed, true, tr("gestures"),
@@ -247,22 +252,23 @@ void Controller::defineSettings()
         [=](Camera &c, V v) { return c.setGesture(3, b(v, "gestureReverse")); });
     def("yawReverse", Kind::Pushed, false, tr("pan direction"),
         [=](Camera &c, V v) { return c.setYawReverse(b(v, "yawReverse")); });
-    def("zoomSpeed", Kind::Pushed, 0, tr("zoom speed"), [=](Camera &c, V v) { return c.setZoomSpeed(i(v, "zoomSpeed")); });
+    def("zoomSpeed", Kind::Pushed, 0, tr("zoom speed"),
+        [=](Camera &c, V v) { return c.setZoomSpeed(i(v, "zoomSpeed")); });
     def("sleepTimer", Kind::Pushed, 0, tr("sleep timer"),
         [=](Camera &c, V v) { return c.setSleepTimer(i(v, "sleepTimer")); });
 
     // Gimbot's own preferences.
     def("invertPan", Kind::App, false, {});
     def("invertTilt", Kind::App, false, {});
-    def("smoothness", Kind::App, 1, {});        // t2::Smoothness
-    def("lastTrackingMode", Kind::App, 2, {});  // mode the tracking switch turns on
-    def("autoResume", Kind::App, false, {});    // resume tracking after a manual move
+    def("smoothness", Kind::App, 1, {});       // t2::Smoothness
+    def("lastTrackingMode", Kind::App, 2, {}); // mode the tracking switch turns on
+    def("autoResume", Kind::App, false, {});   // resume tracking after a manual move
     def("autoResumeSeconds", Kind::App, 5, {});
     def("previewChoice", Kind::App, QString(), {}); // "" auto, or e.g. "1920x1080@60"
     def("tourDone", Kind::App, false, {});
     def("lastRunVersion", Kind::App, QString(), {}); // for "Gimbot was updated" once after an update
-    def("startupPreset", Kind::App, -2, {});   // -2 not chosen here, -1 straight ahead, else preset id
-    def("moreAim", Kind::App, false, {});      // "More" sections on the main screen
+    def("startupPreset", Kind::App, -2, {});         // -2 not chosen here, -1 straight ahead, else preset id
+    def("moreAim", Kind::App, false, {});            // "More" sections on the main screen
     def("moreTracking", Kind::App, false, {});
     def("moreImage", Kind::App, false, {});
     def("gimbalSpeed", Kind::App, 60, {});
@@ -289,11 +295,16 @@ void Controller::call(const QString &key, const QString &what, std::function<boo
             QMetaObject::invokeMethod(
                 this, [this, what] { emit errorOccurred(tr("The camera didn't accept the change to %1.").arg(what)); });
     };
-    if (latest) m_worker.postLatest(key, job);
-    else m_worker.post(job);
+    if (latest)
+        m_worker.postLatest(key, job);
+    else
+        m_worker.post(job);
 }
 
-void Controller::touch(const QString &key) { m_touched[key].start(); }
+void Controller::touch(const QString &key)
+{
+    m_touched[key].start();
+}
 
 bool Controller::held(const QString &key) const
 {
@@ -311,7 +322,8 @@ void Controller::set(const QString &key, const QVariant &value)
     QVariant v = value;
     v.convert(it->def.metaType());
     const auto implied = kImplies.value(key);
-    if (m_values.value(key) == v && (implied.first.isEmpty() || m_values.value(implied.first) == implied.second)) return;
+    if (m_values.value(key) == v && (implied.first.isEmpty() || m_values.value(implied.first) == implied.second))
+        return;
 
     m_values[key] = v;
     touch(key);
@@ -358,11 +370,16 @@ void Controller::sendToCamera(const QString &key)
     const QVariantMap snapshot = m_values;
     // Keys that share one camera call also share a queue slot.
     QString slot = key;
-    if (key.startsWith("zoneYaw") || key.startsWith("zonePitch")) slot = "zoneLimits";
-    else if (key == "wbMode" || key == "wbKelvin") slot = "wb";
-    else if (key == "exposureAuto" || key == "shutter") slot = "exposure";
-    else if (key == "mode" || key == "framing") slot = "mode";
-    else if (key == "autoFocus" || key == "manualFocus") slot = "focus";
+    if (key.startsWith("zoneYaw") || key.startsWith("zonePitch"))
+        slot = "zoneLimits";
+    else if (key == "wbMode" || key == "wbKelvin")
+        slot = "wb";
+    else if (key == "exposureAuto" || key == "shutter")
+        slot = "exposure";
+    else if (key == "mode" || key == "framing")
+        slot = "mode";
+    else if (key == "autoFocus" || key == "manualFocus")
+        slot = "focus";
     auto apply = s.apply;
     call(slot, s.label, [apply, snapshot](Camera &c) { return apply(c, snapshot); });
 }
@@ -553,8 +570,10 @@ void Controller::setLivePosition(bool on)
 {
     if (m_livePosition == on) return;
     m_livePosition = on;
-    if (on && m_connected) m_positionTimer.start();
-    else m_positionTimer.stop();
+    if (on && m_connected)
+        m_positionTimer.start();
+    else
+        m_positionTimer.stop();
     emit livePositionChanged();
 }
 
@@ -586,8 +605,14 @@ t2::axis::Orientation Controller::orientation() const
     return o;
 }
 
-double Controller::pan() const { return t2::axis::screenFromYaw(m_yaw, orientation()); }
-double Controller::tilt() const { return t2::axis::screenFromPitch(m_pitch, orientation()); }
+double Controller::pan() const
+{
+    return t2::axis::screenFromYaw(m_yaw, orientation());
+}
+double Controller::tilt() const
+{
+    return t2::axis::screenFromPitch(m_pitch, orientation());
+}
 
 float Controller::glide() const
 {
@@ -616,7 +641,10 @@ void Controller::leaveTracking()
         m_resumeTimer.start(std::clamp(m_values["autoResumeSeconds"].toInt(), 1, 60) * 1000);
 }
 
-void Controller::toggleTracking() { setTracking(m_values["mode"].toInt() == 0); }
+void Controller::toggleTracking()
+{
+    setTracking(m_values["mode"].toInt() == 0);
+}
 
 void Controller::setTracking(bool on)
 {
@@ -625,7 +653,10 @@ void Controller::setTracking(bool on)
     set("mode", on ? (last >= 1 && last <= 5 ? last : 2) : 0);
 }
 
-void Controller::resumeTracking() { setTracking(true); }
+void Controller::resumeTracking()
+{
+    setTracking(true);
+}
 
 void Controller::move(double tilt, double pan)
 {
@@ -678,7 +709,10 @@ void Controller::aimAbsolute(double pan, double tilt)
     call("move", tr("aiming"), [pitch, yaw, speed](Camera &c) { return c.moveTo(pitch, yaw, speed); });
 }
 
-void Controller::zoomBy(int delta) { set("zoom", std::clamp(m_values["zoom"].toInt() + delta, 0, 100)); }
+void Controller::zoomBy(int delta)
+{
+    set("zoom", std::clamp(m_values["zoom"].toInt() + delta, 0, 100));
+}
 
 // ---------------------------------------------------------------- presets
 
@@ -699,13 +733,15 @@ void Controller::buildPresetList(const std::vector<t2::Preset> &list)
 {
     // Show presets in the order the user arranged (kept per camera); new
     // ones go at the end.
-    const QVariantList order = m_settings.value("presetOrder/" + (m_serial.isEmpty() ? QStringLiteral("camera") : m_serial)).toList();
+    const QVariantList order =
+        m_settings.value("presetOrder/" + (m_serial.isEmpty() ? QStringLiteral("camera") : m_serial)).toList();
     auto rank = [&](int id) {
         const int i = order.indexOf(id);
         return i < 0 ? 1000 + id : i;
     };
     std::vector<t2::Preset> sorted = list;
-    std::stable_sort(sorted.begin(), sorted.end(), [&](const t2::Preset &a, const t2::Preset &b) { return rank(a.id) < rank(b.id); });
+    std::stable_sort(sorted.begin(), sorted.end(),
+                     [&](const t2::Preset &a, const t2::Preset &b) { return rank(a.id) < rank(b.id); });
     m_rawPresets = sorted;
     const auto &listInOrder = m_rawPresets;
     m_presets.clear();
@@ -713,13 +749,13 @@ void Controller::buildPresetList(const std::vector<t2::Preset> &list)
     for (const auto &p : listInOrder) {
         const QString name = QString::fromStdString(p.name);
         const QString path = thumbnailPath(p.id);
-        m_presets.append(QVariantMap{
-            {"id", p.id},
-            {"index", index++},
-            {"name", name.isEmpty() ? tr("Preset %1").arg(p.id + 1) : name},
-            {"thumbnail", QFileInfo::exists(path)
-                              ? QUrl::fromLocalFile(path).toString() + QStringLiteral("?r=%1").arg(m_thumbRev.value(p.id))
-                              : QString()}});
+        m_presets.append(
+            QVariantMap{{"id", p.id},
+                        {"index", index++},
+                        {"name", name.isEmpty() ? tr("Preset %1").arg(p.id + 1) : name},
+                        {"thumbnail", QFileInfo::exists(path) ? QUrl::fromLocalFile(path).toString() +
+                                                                    QStringLiteral("?r=%1").arg(m_thumbRev.value(p.id))
+                                                              : QString()}});
     }
     emit presetsChanged();
 }
@@ -748,7 +784,8 @@ int Controller::savePreset(const QString &name)
     p.id = id;
     p.name = name.toStdString();
     m_rawPresets.push_back(p);
-    std::sort(m_rawPresets.begin(), m_rawPresets.end(), [](const t2::Preset &a, const t2::Preset &b) { return a.id < b.id; });
+    std::sort(m_rawPresets.begin(), m_rawPresets.end(),
+              [](const t2::Preset &a, const t2::Preset &b) { return a.id < b.id; });
     buildPresetList(m_rawPresets);
     const std::string n = name.toStdString();
     call("preset", tr("the preset"), [id, n](Camera &c) { return c.savePreset(id, n); }, false);
@@ -824,9 +861,9 @@ void Controller::renamePreset(int id, const QString &name)
 
 void Controller::deletePreset(int id)
 {
-    m_rawPresets.erase(std::remove_if(m_rawPresets.begin(), m_rawPresets.end(),
-                                      [id](const t2::Preset &p) { return p.id == id; }),
-                       m_rawPresets.end());
+    m_rawPresets.erase(
+        std::remove_if(m_rawPresets.begin(), m_rawPresets.end(), [id](const t2::Preset &p) { return p.id == id; }),
+        m_rawPresets.end());
     buildPresetList(m_rawPresets);
     QFile::remove(thumbnailPath(id));
     call("preset", tr("deleting the preset"), [id](Camera &c) { return c.deletePreset(id); }, false);
@@ -858,8 +895,10 @@ void Controller::resetZone()
         QMetaObject::invokeMethod(this, [=, this] {
             if (!ok) emit errorOccurred(tr("The camera didn't reset the tracking area."));
             if (got)
-                mergeFromCamera({{"zoneYawMin", double(z.yawMin)}, {"zoneYawMax", double(z.yawMax)},
-                                 {"zonePitchMin", double(z.pitchMin)}, {"zonePitchMax", double(z.pitchMax)}},
+                mergeFromCamera({{"zoneYawMin", double(z.yawMin)},
+                                 {"zoneYawMax", double(z.yawMax)},
+                                 {"zonePitchMin", double(z.pitchMin)},
+                                 {"zonePitchMax", double(z.pitchMax)}},
                                 false);
         });
     });
@@ -920,8 +959,10 @@ void Controller::resetTracking()
 {
     snapshotForUndo({"framing", "trackStyle", "fov", "autoZoom"}, tr("Tracking settings reset"));
     m_internalSet = true; // keep tracking as it is
-    if (m_values["mode"].toInt() == 2) set("framing", 1);
-    else m_values["framing"] = 1;
+    if (m_values["mode"].toInt() == 2)
+        set("framing", 1);
+    else
+        m_values["framing"] = 1;
     m_internalSet = false;
     set("trackStyle", 0);
     set("fov", 0);

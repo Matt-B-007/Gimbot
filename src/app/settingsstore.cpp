@@ -53,7 +53,8 @@ bool backup(const QString &file, const QString &backupDir, qint64 minIntervalSec
     QFile in(file);
     if (!in.open(QIODevice::ReadOnly)) return false;
     const QByteArray data = in.readAll();
-    const QString name = QStringLiteral("settings-%1.conf").arg(QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss-zzz"));
+    const QString name =
+        QStringLiteral("settings-%1.conf").arg(QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss-zzz"));
     QSaveFile out(dir.filePath(name)); // temporary file, then rename
     if (!out.open(QIODevice::WriteOnly) || out.write(data) != data.size() || !out.commit()) return false;
     list = dir.entryInfoList(filters, QDir::Files, QDir::Name);

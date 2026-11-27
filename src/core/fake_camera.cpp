@@ -16,7 +16,8 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
-class FakeCamera final : public Camera {
+class FakeCamera final : public Camera
+{
 public:
     FakeCamera()
     {
@@ -27,8 +28,11 @@ public:
         s_.faceFocus = true;
         s_.mirrored = true;
         s_.antiFlicker = 3;
-        image_ = {{ImageParam::Brightness, 50}, {ImageParam::Contrast, 50}, {ImageParam::Saturation, 50},
-                  {ImageParam::Sharpness, 50}, {ImageParam::Hue, 50}};
+        image_ = {{ImageParam::Brightness, 50},
+                  {ImageParam::Contrast, 50},
+                  {ImageParam::Saturation, 50},
+                  {ImageParam::Sharpness, 50},
+                  {ImageParam::Hue, 50}};
         presets_ = {{0, "Desk", 12, 0, 1.2f}, {1, "Whiteboard", 0, 35, 1.0f}};
         // Set GIMBOT_FAKE_FAIL=1 to make every command fail, to test errors.
         fail_ = std::getenv("GIMBOT_FAKE_FAIL") != nullptr;
@@ -49,9 +53,15 @@ public:
         return s_;
     }
 
-    bool setAsleep(bool v) override { return change([&] { s_.asleep = v; }); }
+    bool setAsleep(bool v) override
+    {
+        return change([&] { s_.asleep = v; });
+    }
     bool setSleepTimer(int) override { return !fail_; }
-    bool setMicDuringSleep(bool v) override { return change([&] { s_.micDuringSleep = v; }); }
+    bool setMicDuringSleep(bool v) override
+    {
+        return change([&] { s_.micDuringSleep = v; });
+    }
 
     bool setMode(Mode m, Framing f) override
     {
@@ -78,7 +88,10 @@ public:
     bool bootUseCurrent() override { return !fail_; }
     bool bootGo() override { return moveTo(0, 0); }
     bool bootReset() override { return !fail_; }
-    bool setBootMode(Mode m, Framing) override { return change([&] { s_.bootMode = static_cast<int>(m); }); }
+    bool setBootMode(Mode m, Framing) override
+    {
+        return change([&] { s_.bootMode = static_cast<int>(m); });
+    }
 
     bool move(double pitchSpeed, double yawSpeed) override
     {
@@ -110,14 +123,29 @@ public:
     }
     bool setYawReverse(bool) override { return !fail_; }
 
-    bool setZoom(int p) override { return change([&] { s_.zoomPercent = std::clamp(p, 0, 100); }); }
+    bool setZoom(int p) override
+    {
+        return change([&] { s_.zoomPercent = std::clamp(p, 0, 100); });
+    }
     bool setZoomSpeed(int) override { return !fail_; }
     bool setZoomAtSpeed(int p, int) override { return setZoom(p); }
 
-    bool setFov(Fov f) override { return change([&] { s_.fov = static_cast<int>(f); }); }
-    bool setHdr(bool v) override { return change([&] { s_.hdr = v; }); }
-    bool setMirror(bool v) override { return change([&] { s_.mirrored = v; }); }
-    bool setAutoFocus(bool v) override { return change([&] { s_.autoFocus = v; }); }
+    bool setFov(Fov f) override
+    {
+        return change([&] { s_.fov = static_cast<int>(f); });
+    }
+    bool setHdr(bool v) override
+    {
+        return change([&] { s_.hdr = v; });
+    }
+    bool setMirror(bool v) override
+    {
+        return change([&] { s_.mirrored = v; });
+    }
+    bool setAutoFocus(bool v) override
+    {
+        return change([&] { s_.autoFocus = v; });
+    }
     bool setManualFocus(int v) override
     {
         return change([&] {
@@ -125,9 +153,18 @@ public:
             s_.autoFocus = false;
         });
     }
-    bool setFaceFocus(bool v) override { return change([&] { s_.faceFocus = v; }); }
-    bool setFaceExposure(bool v) override { return change([&] { s_.faceExposure = v; }); }
-    bool setAntiFlicker(int v) override { return change([&] { s_.antiFlicker = v; }); }
+    bool setFaceFocus(bool v) override
+    {
+        return change([&] { s_.faceFocus = v; });
+    }
+    bool setFaceExposure(bool v) override
+    {
+        return change([&] { s_.faceExposure = v; });
+    }
+    bool setAntiFlicker(int v) override
+    {
+        return change([&] { s_.antiFlicker = v; });
+    }
     bool setExposure(bool a, int v) override
     {
         std::lock_guard<std::mutex> l(m_);
@@ -174,7 +211,10 @@ public:
     }
     Range imageRange(ImageParam) const override { return {0, 100, 1, 50, true}; }
 
-    bool setAudioAutoGain(bool v) override { return change([&] { s_.audioAutoGain = v; }); }
+    bool setAudioAutoGain(bool v) override
+    {
+        return change([&] { s_.audioAutoGain = v; });
+    }
     bool setVoiceCommand(Voice v, bool on) override
     {
         return change([&] {
@@ -249,7 +289,8 @@ public:
     }
 
 private:
-    template <typename F> bool change(F &&f)
+    template <typename F>
+    bool change(F &&f)
     {
         std::function<void(const Status &)> fn;
         Status copy;
@@ -263,14 +304,16 @@ private:
         if (fn) fn(copy);
         return true;
     }
-    template <typename T> bool set(T &field, const T &v)
+    template <typename T>
+    bool set(T &field, const T &v)
     {
         std::lock_guard<std::mutex> l(m_);
         if (fail_) return false;
         field = v;
         return true;
     }
-    template <typename T> bool get(const T &field, T &out) const
+    template <typename T>
+    bool get(const T &field, T &out) const
     {
         std::lock_guard<std::mutex> l(m_);
         out = field;
@@ -300,6 +343,9 @@ private:
 
 } // namespace
 
-std::unique_ptr<Camera> openFakeCamera() { return std::make_unique<FakeCamera>(); }
+std::unique_ptr<Camera> openFakeCamera()
+{
+    return std::make_unique<FakeCamera>();
+}
 
 } // namespace t2

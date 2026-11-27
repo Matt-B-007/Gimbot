@@ -27,8 +27,8 @@ bool looksLikeVersion(const QString &text, qsizetype start, qsizetype end, const
 
 QString replaceIPv4(const QString &text)
 {
-    static const RE ipv4(QStringLiteral(
-        "(?<![\\w.])((?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3})(?![\\w.]*\\d)(?!\\.\\w)"));
+    static const RE ipv4(QStringLiteral("(?<![\\w.])((?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|"
+                                        "1\\d\\d|[1-9]?\\d)){3})(?![\\w.]*\\d)(?!\\.\\w)"));
     QString out;
     qsizetype last = 0;
     auto it = ipv4.globalMatch(text);
@@ -87,16 +87,17 @@ QString apply(QString text, const Context &ctx)
         if (e.first.size() > 3) text.replace(e.first, e.second);
 
     // Secrets before anything else rewrites them.
-    static const RE keyValue(QStringLiteral(
-        "((?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|auth|authorization|private[_-]?key)"
-        "[\"']?\\s*[:=]\\s*[\"']?)(?:Bearer\\s+|Basic\\s+)?[^\\s\"',;&]+"),
-                             RE::CaseInsensitiveOption);
+    static const RE keyValue(
+        QStringLiteral(
+            "((?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|auth|authorization|private[_-]?key)"
+            "[\"']?\\s*[:=]\\s*[\"']?)(?:Bearer\\s+|Basic\\s+)?[^\\s\"',;&]+"),
+        RE::CaseInsensitiveOption);
     text.replace(keyValue, QStringLiteral("\\1<secret>"));
     static const RE bearer(QStringLiteral("\\b(Bearer|Basic)\\s+[A-Za-z0-9._~+/=-]{8,}"));
     text.replace(bearer, QStringLiteral("\\1 <secret>"));
-    static const RE knownTokens(QStringLiteral(
-        "\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|"
-        "xox[abprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16})"));
+    static const RE knownTokens(
+        QStringLiteral("\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|"
+                       "xox[abprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16})"));
     text.replace(knownTokens, QStringLiteral("<secret>"));
     static const RE urlPassword(QStringLiteral("(\\w+://[^\\s:/@]+:)[^\\s@/]+@"));
     text.replace(urlPassword, QStringLiteral("\\1<secret>@"));
@@ -106,17 +107,22 @@ QString apply(QString text, const Context &ctx)
         text.replace(ctx.home, QStringLiteral("~"));
         QString win = ctx.home;
         win.replace('/', QLatin1String("\\\\"));
-        text.replace(RE(QStringLiteral("\\b[A-Za-z]:") + win + QStringLiteral("(?=\\\\|\\b|$)"), RE::CaseInsensitiveOption),
-                     QStringLiteral("~"));
+        text.replace(
+            RE(QStringLiteral("\\b[A-Za-z]:") + win + QStringLiteral("(?=\\\\|\\b|$)"), RE::CaseInsensitiveOption),
+            QStringLiteral("~"));
     }
     if (ctx.user.size() > 2) {
         const QString u = RE::escape(ctx.user);
         // Windows profiles: C:\users\matt
-        text.replace(RE(QStringLiteral("\\b[A-Za-z]:\\\\users\\\\") + u + QStringLiteral("\\b"), RE::CaseInsensitiveOption),
-                     QStringLiteral("~"));
+        text.replace(
+            RE(QStringLiteral("\\b[A-Za-z]:\\\\users\\\\") + u + QStringLiteral("\\b"), RE::CaseInsensitiveOption),
+            QStringLiteral("~"));
         text.replace(RE(QStringLiteral("\\b") + u + QStringLiteral("\\b")), QStringLiteral("<user>"));
     }
-    if (ctx.host.size() > 2) text.replace(RE(QStringLiteral("\\b") + RE::escape(ctx.host) + QStringLiteral("\\b"), RE::CaseInsensitiveOption), QStringLiteral("<host>"));
+    if (ctx.host.size() > 2)
+        text.replace(
+            RE(QStringLiteral("\\b") + RE::escape(ctx.host) + QStringLiteral("\\b"), RE::CaseInsensitiveOption),
+            QStringLiteral("<host>"));
 
     // Steam account ids only; game and app ids are short and stay.
     static const RE steam(QStringLiteral("\\b7656119\\d{10}\\b"));

@@ -40,7 +40,7 @@ constexpr int Auto = 0, Daylight = 1, Fluorescent = 2, Tungsten = 3, Cloudy = 10
 namespace shutter {
 constexpr int First = 9, Last = 45;
 const char *label(int value); // "1/60" etc.
-}
+} // namespace shutter
 
 // Voice commands, matching AudioCtrlCmdType.
 enum class Voice : int { HiTiny = 0, SleepTiny, TrackMe, Unlock, ZoomIn, ZoomOut, Presets, Count };
@@ -50,23 +50,23 @@ struct Status {
     bool valid = false;
     Mode mode = Mode::Off;
     bool modeSwitching = false; // the camera is changing modes; `mode` is not meaningful
-    int framing = 0;          // AiSubModeType
-    int zoomPercent = 0;      // 0..100
+    int framing = 0;            // AiSubModeType
+    int zoomPercent = 0;        // 0..100
     bool hdr = false;
     bool asleep = false;
-    int fov = 0;              // FovType
+    int fov = 0; // FovType
     bool autoFocus = true;
     bool faceFocus = false;
-    int manualFocus = 0;      // 0..100
+    int manualFocus = 0; // 0..100
     bool mirrored = false;
     bool faceExposure = false;
-    int antiFlicker = 0;      // 0 off, 1 50 Hz, 2 60 Hz, 3 auto
+    int antiFlicker = 0; // 0 off, 1 50 Hz, 2 60 Hz, 3 auto
     int trackSpeed = 0;
     bool micDuringSleep = false;
-    int voiceLanguage = 1;    // VoiceLanguage
-    int voiceMask = 0x7f;     // bit n = Voice n enabled
+    int voiceLanguage = 1; // VoiceLanguage
+    int voiceMask = 0x7f;  // bit n = Voice n enabled
     bool audioAutoGain = true;
-    int bootMode = 0;         // AiWorkModeType the camera starts in
+    int bootMode = 0; // AiWorkModeType the camera starts in
 };
 
 struct Range {
@@ -111,8 +111,8 @@ struct Orientation {
     bool invertPan = false;  // user override
     bool invertTilt = false; // user override
 };
-constexpr double kPitchPerUp = -1.0;    // SDK pitch per unit of screen "up"
-constexpr double kYawPerRight = -1.0;   // SDK yaw per unit of screen "right", unmirrored
+constexpr double kPitchPerUp = -1.0;  // SDK pitch per unit of screen "up"
+constexpr double kYawPerRight = -1.0; // SDK yaw per unit of screen "right", unmirrored
 inline double yawSign(const Orientation &o)
 {
     double s = kYawPerRight;
@@ -120,21 +120,37 @@ inline double yawSign(const Orientation &o)
     if (o.invertPan) s = -s;
     return s;
 }
-inline double pitchSign(const Orientation &o) { return o.invertTilt ? -kPitchPerUp : kPitchPerUp; }
+inline double pitchSign(const Orientation &o)
+{
+    return o.invertTilt ? -kPitchPerUp : kPitchPerUp;
+}
 // Both directions use the same sign, so these work for angles and speeds.
-inline double yawFromScreen(double right, const Orientation &o) { return yawSign(o) * right; }
-inline double pitchFromScreen(double up, const Orientation &o) { return pitchSign(o) * up; }
-inline double screenFromYaw(double yaw, const Orientation &o) { return yawSign(o) * yaw; }
-inline double screenFromPitch(double pitch, const Orientation &o) { return pitchSign(o) * pitch; }
+inline double yawFromScreen(double right, const Orientation &o)
+{
+    return yawSign(o) * right;
+}
+inline double pitchFromScreen(double up, const Orientation &o)
+{
+    return pitchSign(o) * up;
+}
+inline double screenFromYaw(double yaw, const Orientation &o)
+{
+    return yawSign(o) * yaw;
+}
+inline double screenFromPitch(double pitch, const Orientation &o)
+{
+    return pitchSign(o) * pitch;
+}
 } // namespace axis
 
 // How fast the gimbal glides to a new position. Fast = the camera's own
 // maximum, the others use a reference speed in degrees per second.
 enum class Smoothness : int { Fast = 0, Normal = 1, Smooth = 2, Cinematic = 3 };
-float glideSpeed(Smoothness s);    // deg/s, 0 = camera maximum
-int glideZoomSpeed(Smoothness s);  // 1..10, 0 = camera default
+float glideSpeed(Smoothness s);   // deg/s, 0 = camera maximum
+int glideZoomSpeed(Smoothness s); // 1..10, 0 = camera default
 
-class Camera {
+class Camera
+{
 public:
     virtual ~Camera() = default;
 
@@ -191,8 +207,8 @@ public:
     bool glideToPreset(int id, float speed, int zoomSpeed);
 
     // Zoom
-    virtual bool setZoom(int percent) = 0;   // 0..100 of the camera's range
-    virtual bool setZoomSpeed(int speed) = 0; // 0 = camera default, 1..10
+    virtual bool setZoom(int percent) = 0;                   // 0..100 of the camera's range
+    virtual bool setZoomSpeed(int speed) = 0;                // 0 = camera default, 1..10
     virtual bool setZoomAtSpeed(int percent, int speed) = 0; // one-off speed
     // Magnification at 100% zoom (the Tiny 2 reports its range, usually 4x).
     virtual float maxZoom() const { return 4.0f; }
@@ -235,7 +251,8 @@ public:
 // ---------------------------------------------------------------- SDK
 
 // Device discovery for real cameras.
-class Discovery {
+class Discovery
+{
 public:
     using ChangeFn = std::function<void(const std::string &serial, bool connected)>;
     // Returns false if the system has no USB bus to scan (libdev would crash).

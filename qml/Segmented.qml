@@ -24,7 +24,7 @@ Rectangle {
     border.color: Qt.rgba(1, 1, 1, 0.1)
     Accessible.role: Accessible.PageTabList
     Accessible.name: accessibleName.length > 0 ? accessibleName
-                   : (parent && parent.parent && parent.parent.label !== undefined ? parent.parent.label : "")
+                   : (parent && parent.parent && parent.parent.label !== undefined ? parent.parent.label : "") // qmllint disable missing-property
 
     Rectangle {
         id: highlight

@@ -10,6 +10,7 @@
 #   OBSBOT_SDK_DIR   build against the real SDK (CI builds the simulated camera only)
 #   GIMBOT_MIN_QT    oldest Qt to accept (default 6.8)
 #   BUILD_DIR        where to build (default build-check)
+#   QMLLINT          the qmllint to use (default: the one that comes with Qt)
 #
 # Exit codes: 0 every check passed, 1 a check failed, 3 only tools are
 # missing (nothing was checked; the list says what to install).
@@ -21,6 +22,7 @@ cd "$(dirname "$0")/.." || exit 1
 
 SHELLCHECK_PIN="0.11.0"     # CI: pip install shellcheck-py==0.11.0.1
 ACTIONLINT_PIN="1.7.12"     # CI: pip install actionlint-py==1.7.12.25
+CLANG_FORMAT_PIN="23.1.5"   # Arch's clang; CI: pip install clang-format==23.1.5
 BUILD_DIR="${BUILD_DIR:-build-check}"
 
 if [[ -t 1 && -z "${NO_COLOR+x}" ]]; then
@@ -44,6 +46,7 @@ want "a C++ compiler (c++)" gcc "$(has c++)"
 want "shellcheck" shellcheck "$(has shellcheck)"
 want "actionlint" actionlint "$(has actionlint)"
 want "awk" gawk "$(has awk)"
+want "clang-format" clang "$(has clang-format)"
 qtpaths=""
 for q in qtpaths6 /usr/lib/qt6/bin/qtpaths6 /usr/lib/qt6/bin/qtpaths; do
     if command -v "$q" >/dev/null 2>&1; then qtpaths="$q"; break; fi
@@ -57,6 +60,8 @@ if [[ -n "$qtpaths" ]]; then
     svg=no
     for f in "$libs"/libQt6Svg.so*; do if [[ -e "$f" ]]; then svg=yes; fi; done
     want "Qt SVG" qt6-svg "$svg"
+    qmllint="${QMLLINT:-$("$qtpaths" --query QT_INSTALL_BINS)/qmllint}"
+    want "qmllint" qt6-declarative "$(command -v "$qmllint" >/dev/null 2>&1 && echo yes || echo no)"
 fi
 if (( ${#missing[@]} > 0 )); then
     printf '%sMissing tools, so nothing was checked:%s\n' "$red" "$off" >&2
@@ -67,6 +72,8 @@ fi
 sc_ver="$(shellcheck --version | sed -n 's/^version: //p')"
 al_ver="$(actionlint --version | head -n1)"
 echo "shellcheck $sc_ver (CI: $SHELLCHECK_PIN), actionlint $al_ver (CI: $ACTIONLINT_PIN), $(cmake --version | head -n1)"
+cf_ver="$(clang-format --version | sed -nE 's/.*version ([0-9.]+).*/\1/p')"
+echo "clang-format $cf_ver (CI: $CLANG_FORMAT_PIN), $("$qmllint" --version 2>/dev/null | head -n1)"
 if [[ "$sc_ver" != "$SHELLCHECK_PIN" || "$al_ver" != "$ACTIONLINT_PIN" ]]; then
     echo "Note: these aren't the versions CI uses, so findings may differ slightly. That's fine on your PC."
 fi
@@ -115,11 +122,48 @@ if (( ${#no_spdx[@]} > 0 )); then
 fi
 echo "every source file has one"
 
+step "C++ formatting (clang-format --dry-run --Werror, style in .clang-format)"
+# Formatting can differ between clang-format major versions. CI always has
+# the pinned one; on your PC a different major version only skips this step
+# (with a note), so an Arch update can't block a push.
+if [[ "${cf_ver%%.*}" != "${CLANG_FORMAT_PIN%%.*}" && -z "${GITHUB_ACTIONS:-}" ]]; then
+    echo "SKIPPED: clang-format $cf_ver isn't version ${CLANG_FORMAT_PIN%%.*} (the pinned one), so its formatting may differ. CI still checks it."
+else
+    if [[ "$cf_ver" != "$CLANG_FORMAT_PIN" ]]; then
+        echo "Note: clang-format $cf_ver, CI uses $CLANG_FORMAT_PIN."
+    fi
+    mapfile -d '' cpp_files < <(find src tests -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' \) -print0 | sort -z)
+    if ! clang-format --dry-run --Werror "${cpp_files[@]}"; then
+        fail "C++ formatting differs from .clang-format; run: clang-format -i \$(find src tests -name '*.[ch]pp')"
+    fi
+    echo "${#cpp_files[@]} files formatted correctly"
+fi
+
 step "Configure and build (cmake, Debug, tests on, warnings are errors)"
 cmake_args=(-S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DGIMBOT_WERROR=ON "-DGIMBOT_MIN_QT=${GIMBOT_MIN_QT:-6.8}")
 if [[ -n "${OBSBOT_SDK_DIR:-}" ]]; then cmake_args+=("-DOBSBOT_SDK_DIR=$OBSBOT_SDK_DIR"); fi
 cmake "${cmake_args[@]}" >/dev/null || fail "cmake configure"
 cmake --build "$BUILD_DIR" -j"$(nproc)" || fail "build"
+
+step "QML lint (qmllint with .qmllint.ini; any warning fails)"
+# qmllint reads the module's qmldir and types from the build, and gets each
+# file by its full path so it knows the file belongs to the module.
+lint_dir="$(realpath "$BUILD_DIR")/qmllint"
+rm -rf "$lint_dir"
+mkdir -p "$lint_dir/Gimbot"
+cp qml/*.qml "$lint_dir/Gimbot/"
+cp -r qml/icons qml/fonts "$lint_dir/Gimbot/"
+grep -vE '^(typeinfo|prefer) ' "$BUILD_DIR/Gimbot/qmldir" > "$lint_dir/Gimbot/qmldir"
+if [[ -f "$BUILD_DIR/Gimbot/gimbot.qmltypes" ]]; then
+    cp "$BUILD_DIR/Gimbot/gimbot.qmltypes" "$lint_dir/Gimbot/"
+    echo "typeinfo gimbot.qmltypes" >> "$lint_dir/Gimbot/qmldir"
+fi
+cp .qmllint.ini "$lint_dir/"
+qml_files=("$lint_dir"/Gimbot/*.qml)
+if ! (cd "$lint_dir" && "$qmllint" -I "$lint_dir" "${qml_files[@]}"); then
+    fail "qmllint found problems (files are copies in $lint_dir/Gimbot; fix them in qml/)"
+fi
+echo "${#qml_files[@]} QML files lint clean"
 
 step "Unit and controller tests (ctest)"
 QT_QPA_PLATFORM=offscreen ctest --test-dir "$BUILD_DIR" --output-on-failure || fail "ctest"

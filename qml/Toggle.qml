@@ -15,7 +15,7 @@ Switch {
     property string accessibleName: ""
     // Inside a SettingRow, screen readers use the row's label.
     Accessible.name: accessibleName.length > 0 ? accessibleName : text.length > 0 ? text
-                   : (parent && parent.parent && parent.parent.label !== undefined ? parent.parent.label : "")
+                   : (parent && parent.parent && parent.parent.label !== undefined ? parent.parent.label : "") // qmllint disable missing-property
     Accessible.description: tip
 
     Tip { visible: control.hovered && control.tip.length > 0; text: control.tip }

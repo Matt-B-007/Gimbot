@@ -440,6 +440,7 @@ Rectangle {
     }
 
     component Chip: Rectangle {
+        id: chip
         property alias text: label.text
         property color dotColor: "transparent"
         property bool showDot: false
@@ -453,7 +454,7 @@ Rectangle {
             id: chipRow
             anchors.centerIn: parent
             spacing: 8
-            Rectangle { visible: chipRow.parent.showDot; width: 8; height: 8; radius: 4; color: chipRow.parent.dotColor }
+            Rectangle { visible: chip.showDot; width: 8; height: 8; radius: 4; color: chip.dotColor }
             Text { id: label; color: "#e8edf4"; font.family: Theme.font; font.pixelSize: Theme.small; font.weight: Font.Medium }
         }
     }

@@ -3,6 +3,32 @@
 What changed in each version of Gimbot. The newest is at the top; the app
 shows a version's notes in its update window.
 
+## 0.1.0-beta.13 (2026-11-27)
+A tidy-up of the code with nothing for you to notice, plus a fix that lets
+updates arrive again.
+- **Updates work again:** beta.10, 11 and 12 were published without their
+  signature files, so Gimbot (rightly) wouldn't install them. The release
+  was being created when the files were uploaded, and the publishing job
+  took "a release exists" to mean "already done". It now checks for the
+  signature, and adds the checked, signed files to a release that doesn't
+  have them yet, the signature last. If adding them fails, the files already
+  added are taken off again. This version is the first to arrive that way.
+- **Code tidy-up, no changes in behaviour:** all C++ is formatted with
+  clang-format (style in `.clang-format`), and the QML passes qmllint with no
+  warnings (settings in `.qmllint.ini`). A few objects were renamed so they
+  no longer hide Qt's own properties of the same name (the command palette,
+  the toast list, the status strip's message and the preview), and a few
+  bindings name the object they mean instead of reaching it through
+  `parent`. The screenshots before and after are identical.
+- **Two new checks:** `scripts/check.sh` (and so CI and StowLock) now checks
+  the C++ formatting with clang-format 23.1.5 (the version Arch ships, and
+  pinned in CI) and runs qmllint, where any warning fails. If clang-format
+  is missing, it says to install `clang`.
+- **One qmllint rule is off on purpose:** the app hands `cam`, `platform`
+  and `updater` to QML from C++ as context properties, which qmllint can't
+  see. Turning them into QML singletons would change how the app starts,
+  so that's left for a release of its own.
+
 ## 0.1.0-beta.12 (2026-11-27)
 Gimbot's new colors, shared with the other apps in the family, plus terminal
 commands and the project files that make it easier to help.

@@ -10,7 +10,8 @@
 
 #include <functional>
 
-class Worker : public QObject {
+class Worker : public QObject
+{
     Q_OBJECT
 public:
     explicit Worker(QObject *parent = nullptr);

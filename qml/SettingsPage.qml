@@ -828,6 +828,7 @@ Rectangle {
                             }
                         }
                         SettingRow {
+                            id: sdkRow
                             readonly property string saved: platform.savedSdk
                             readonly property string savedVersion: saved.replace(/^libdev_?v?/, "").replace(/\.zip$/, "")
                             readonly property bool newer: saved.length > 0 && savedVersion !== platform.sdkVersion
@@ -839,7 +840,7 @@ Rectangle {
                             Btn { text: qsTr("Open folder"); iconName: "folder"; variant: "ghost"; compact: true; onClicked: platform.openSdkFolder() }
                             Btn { text: qsTr("Add SDK…"); iconName: "plus"; compact: true; onClicked: sdkDialog.open() }
                             Btn {
-                                visible: parent.parent.newer && updater.canInstall
+                                visible: sdkRow.newer && updater.canInstall
                                 text: qsTr("Rebuild")
                                 iconName: "refresh"
                                 variant: "primary"

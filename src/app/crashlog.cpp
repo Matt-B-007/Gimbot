@@ -21,7 +21,7 @@
 namespace {
 
 constexpr int kKeep = 10;
-char g_path[4096] = {0};   // this session's crash file, prepared up front
+char g_path[4096] = {0}; // this session's crash file, prepared up front
 char g_header[256] = {0};
 
 // Runs inside a signal handler: only async-signal-safe calls.
@@ -36,7 +36,10 @@ void writeTrace(int sig)
     char num[16];
     int v = sig, i = 15;
     num[i] = 0;
-    do { num[--i] = char('0' + v % 10); v /= 10; } while (v && i > 0);
+    do {
+        num[--i] = char('0' + v % 10);
+        v /= 10;
+    } while (v && i > 0);
     put(num + i);
     put("\nBacktrace:\n");
     void *frames[64];
@@ -58,7 +61,10 @@ void onFault(int sig)
 
 namespace CrashLog {
 
-QString dir() { return Logger::stateDir() + "/crashes"; }
+QString dir()
+{
+    return Logger::stateDir() + "/crashes";
+}
 
 void install()
 {

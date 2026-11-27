@@ -5,10 +5,21 @@
 
 namespace t2 {
 
-bool Discovery::start(ChangeFn) { return false; }
-void Discovery::stop() {}
-std::vector<std::string> Discovery::cameras() { return {}; }
-void Discovery::setVerbose(bool) {}
-std::unique_ptr<Camera> openSdkCamera(const std::string &) { return nullptr; }
+bool Discovery::start(ChangeFn)
+{
+    return false;
+}
+void Discovery::stop()
+{}
+std::vector<std::string> Discovery::cameras()
+{
+    return {};
+}
+void Discovery::setVerbose(bool)
+{}
+std::unique_ptr<Camera> openSdkCamera(const std::string &)
+{
+    return nullptr;
+}
 
 } // namespace t2

@@ -122,6 +122,7 @@ Card {
 
     // One-click zoom levels, worked out from the camera's own zoom range.
     RowLayout {
+        id: zoomLevels
         Layout.fillWidth: true
         spacing: 6
         readonly property real maxZoom: cam.ranges.zoomMax > 1 ? cam.ranges.zoomMax : 4
@@ -137,7 +138,7 @@ Card {
             }
             Btn {
                 required property real modelData
-                readonly property int percent: parent.percentFor(modelData)
+                readonly property int percent: zoomLevels.percentFor(modelData)
                 Layout.fillWidth: true
                 text: (Math.round(modelData * 10) / 10) + "×"
                 variant: Math.abs(cam.values.zoom - percent) <= 1 ? "primary" : "outline"

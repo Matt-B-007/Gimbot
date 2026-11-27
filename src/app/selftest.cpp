@@ -90,8 +90,9 @@ void checkInterface()
     qInstallMessageHandler(nullptr);
     const bool loaded = !engine.rootObjects().isEmpty();
     report(loaded && g_qmlProblems.isEmpty(), "Loads the interface",
-           !loaded ? QStringLiteral("the main window didn't load")
-                   : g_qmlProblems.isEmpty() ? QString() : g_qmlProblems.first().left(160));
+           !loaded                   ? QStringLiteral("the main window didn't load")
+           : g_qmlProblems.isEmpty() ? QString()
+                                     : g_qmlProblems.first().left(160));
 }
 
 void checkCamera()
@@ -191,7 +192,8 @@ int run(int argc, char *argv[])
     {
         // Read the real settings file (read-only).
         QSettings s(realSettings, QSettings::IniFormat);
-        if (!QFileInfo::exists(realSettings)) report(true, "Reads the settings", "none saved yet");
+        if (!QFileInfo::exists(realSettings))
+            report(true, "Reads the settings", "none saved yet");
         else
             report(s.status() == QSettings::NoError, "Reads the settings",
                    QStringLiteral("version %1").arg(s.value("meta/settingsVersion", 1).toInt()));

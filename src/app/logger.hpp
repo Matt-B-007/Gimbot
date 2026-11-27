@@ -9,8 +9,8 @@
 namespace Logger {
 void install();
 void setVerbose(bool on); // include debug messages
-QString logDir();   // ~/.local/state/gimbot (XDG_STATE_HOME)
-QString stateDir(); // same folder; crash traces go in stateDir()/crashes
+QString logDir();         // ~/.local/state/gimbot (XDG_STATE_HOME)
+QString stateDir();       // same folder; crash traces go in stateDir()/crashes
 QString logFile();
 QStringList recent(int lines = 200);
 // The last lines of the log file (earlier sessions too), for `gimbot --report`.

@@ -19,7 +19,7 @@ Rectangle {
     readonly property var wbNames: [qsTr("Auto"), qsTr("Daylight"), qsTr("Cloudy"), qsTr("Indoor"), qsTr("Fluorescent"), qsTr("Manual")]
 
     // The most important thing to say, in order.
-    readonly property var state: {
+    readonly property var current: { // what the strip shows now
         if (!cam.connected) return { tone: "muted", text: qsTr("No camera connected"), action: "" }
         if (v.asleep) return { tone: "warning", text: qsTr("The camera is asleep. Other apps see a privacy screen."), action: qsTr("Wake"), run: () => cam.set("asleep", false) }
         if (previewError.length > 0) return { tone: "warning", text: qsTr("No preview: another app such as Zoom or OBS may be using the camera's video. The controls still work."), action: qsTr("Try again"), run: () => root.retryPreview() }
@@ -29,7 +29,7 @@ Rectangle {
         if (videoSize.width > 0) parts.push(qsTr("Preview %1×%2 at %3 fps").arg(videoSize.width).arg(videoSize.height).arg(Math.round(videoFps)))
         return { tone: "ok", text: qsTr("Ready") + " · " + parts.join(" · "), action: "" }
     }
-    readonly property color toneColor: state.tone === "ok" ? Theme.success : state.tone === "warning" ? Theme.warning : Theme.textFaint
+    readonly property color toneColor: current.tone === "ok" ? Theme.success : current.tone === "warning" ? Theme.warning : Theme.textFaint
 
     // Settings that are off their automatic or usual value.
     readonly property var chips: {
@@ -50,9 +50,9 @@ Rectangle {
     radius: Theme.radius
     color: Theme.surface
     border.width: 1
-    border.color: state.tone === "warning" ? Qt.rgba(toneColor.r, toneColor.g, toneColor.b, 0.5) : Theme.border
+    border.color: current.tone === "warning" ? Qt.rgba(toneColor.r, toneColor.g, toneColor.b, 0.5) : Theme.border
     Accessible.role: Accessible.StatusBar
-    Accessible.name: state.text
+    Accessible.name: current.text
 
     RowLayout {
         id: row
@@ -62,7 +62,7 @@ Rectangle {
         spacing: 10
         Rectangle { width: 8; height: 8; radius: 4; color: root.toneColor }
         Text {
-            text: root.state.text
+            text: root.current.text
             color: Theme.text
             font.family: Theme.font
             font.pixelSize: Theme.small + 1
@@ -105,11 +105,11 @@ Rectangle {
             }
         }
         Btn {
-            visible: root.state.action.length > 0
-            text: root.state.action
+            visible: root.current.action.length > 0
+            text: root.current.action
             variant: "outline"
             compact: true
-            onClicked: root.state.run()
+            onClicked: root.current.run()
         }
     }
 }

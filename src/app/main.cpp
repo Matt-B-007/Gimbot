@@ -3,8 +3,8 @@
 #include "controller.hpp"
 #include "crashlog.hpp"
 #include "logger.hpp"
-#include "selftest.hpp"
 #include "platform.hpp"
+#include "selftest.hpp"
 #include "updater.hpp"
 
 #include <QApplication>
@@ -14,20 +14,20 @@
 #include <QDBusMessage>
 #include <QDir>
 #include <QFile>
-#include <QStandardPaths>
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QSocketNotifier>
+#include <QStandardPaths>
 #include <QTimer>
 
 #include <csignal>
 #include <cstdio>
-#include <vector>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <vector>
 
 #ifdef GIMBOT_HAVE_KF6
 #include <KAboutData>
@@ -79,8 +79,8 @@ int main(int argc, char *argv[])
     if (qEnvironmentVariableIsEmpty("DISPLAY") && qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) {
         for (int i = 1; i < argc; ++i) {
             const QByteArray a(argv[i]);
-            if (a == "-h" || a == "--help" || a == "-v" || a == "--version" || a == "--report" || a == "--update"
-                || a == "--rollback" || a == "--uninstall") {
+            if (a == "-h" || a == "--help" || a == "-v" || a == "--version" || a == "--report" || a == "--update" ||
+                a == "--rollback" || a == "--uninstall") {
                 qputenv("QT_QPA_PLATFORM", "offscreen");
                 break;
             }
@@ -121,7 +121,8 @@ int main(int argc, char *argv[])
     QCommandLineOption shots("screenshots", "Save screenshots of each screen to DIR and quit (for testing).", "DIR");
     QCommandLineOption selfTest("self-test", "Check that Gimbot works, then exit (add --quick for the short check).");
     QCommandLineOption quick("quick", "With --self-test: only start, load the interface and read settings.");
-    QCommandLineOption report("report", "Save a problem report (personal details hidden) to Downloads, print where, and exit.");
+    QCommandLineOption report("report",
+                              "Save a problem report (personal details hidden) to Downloads, print where, and exit.");
     QCommandLineOption update("update", "Install the newest version for your update channel (runs gimbot-update).");
     QCommandLineOption rollback("rollback", "Go back to the version installed before the last update.");
     QCommandLineOption uninstall("uninstall", "Remove Gimbot (asks whether to delete your settings too).");
@@ -137,14 +138,20 @@ int main(int argc, char *argv[])
         const bool beta = QStringLiteral(GIMBOT_VERSION).contains('-');
         if (installType == QLatin1String("aur")) {
             const QString pkg = beta ? QStringLiteral("gimbot-beta") : QStringLiteral("gimbot");
-            if (parser.isSet(update)) std::printf("Gimbot came from the AUR, so update it there:\n  paru -Syu %s\n", qPrintable(pkg));
-            else if (parser.isSet(rollback)) std::printf("Gimbot came from the AUR. To go back, reinstall the older package from your package cache:\n  sudo pacman -U /var/cache/pacman/pkg/%s-<version>-*.pkg.tar.zst\n", qPrintable(pkg));
-            else std::printf("Gimbot came from the AUR. Remove it with:\n  sudo pacman -R %s\n", qPrintable(pkg));
+            if (parser.isSet(update))
+                std::printf("Gimbot came from the AUR, so update it there:\n  paru -Syu %s\n", qPrintable(pkg));
+            else if (parser.isSet(rollback))
+                std::printf("Gimbot came from the AUR. To go back, reinstall the older package from your package "
+                            "cache:\n  sudo pacman -U /var/cache/pacman/pkg/%s-<version>-*.pkg.tar.zst\n",
+                            qPrintable(pkg));
+            else
+                std::printf("Gimbot came from the AUR. Remove it with:\n  sudo pacman -R %s\n", qPrintable(pkg));
             return 0;
         }
         const QString helper = QStandardPaths::findExecutable(QStringLiteral("gimbot-update"));
         if (helper.isEmpty()) {
-            std::fprintf(stderr, "gimbot-update isn't installed, so Gimbot can't do this itself. Use the install line from the README instead.\n");
+            std::fprintf(stderr, "gimbot-update isn't installed, so Gimbot can't do this itself. Use the install line "
+                                 "from the README instead.\n");
             return 1;
         }
         QStringList args;
@@ -168,14 +175,15 @@ int main(int argc, char *argv[])
     auto bus = QDBusConnection::sessionBus();
     const bool running = bus.isConnected() && bus.interface()->isServiceRegistered(kService);
     if (parser.isSet(report) && running) {
-        const QDBusMessage reply = bus.call(
-            QDBusMessage::createMethodCall(kService, "/Gimbot", "io.github.Matt_B_007.Gimbot1", "SaveReport"));
+        const QDBusMessage reply =
+            bus.call(QDBusMessage::createMethodCall(kService, "/Gimbot", "io.github.Matt_B_007.Gimbot1", "SaveReport"));
         const QString path = reply.arguments().value(0).toString();
         if (reply.type() != QDBusMessage::ReplyMessage || path.isEmpty()) {
             std::fprintf(stderr, "Couldn't save the report.\n");
             return 1;
         }
-        std::printf("Report saved to %s\nAttach it to an issue at https://github.com/%s/issues\n", qPrintable(path), GIMBOT_REPO);
+        std::printf("Report saved to %s\nAttach it to an issue at https://github.com/%s/issues\n", qPrintable(path),
+                    GIMBOT_REPO);
         return 0;
     }
 
@@ -206,7 +214,8 @@ int main(int argc, char *argv[])
             std::fprintf(stderr, "Couldn't save the report.\n");
             return 1;
         }
-        std::printf("Report saved to %s\nAttach it to an issue at https://github.com/%s/issues\n", qPrintable(path), GIMBOT_REPO);
+        std::printf("Report saved to %s\nAttach it to an issue at https://github.com/%s/issues\n", qPrintable(path),
+                    GIMBOT_REPO);
         return 0;
     }
 
@@ -242,8 +251,9 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("platform", &platform);
     engine.rootContext()->setContextProperty("updater", &updater);
     engine.rootContext()->setContextProperty("startHidden", parser.isSet(hidden));
-    QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); },
-                     Qt::QueuedConnection);
+    QObject::connect(
+        &engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); },
+        Qt::QueuedConnection);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     engine.loadFromModule("Gimbot", "Main");
 #else
@@ -270,12 +280,40 @@ int main(int argc, char *argv[])
         QDir().mkpath(dir);
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         engine.rootObjects().first()->setProperty("screenshotMode", true);
-        const QStringList steps = {"readme-dark", "readme-light", "studio",  "more", "settings", "settings:image", "settings:motion", "settings:app",
-                                   "settings:device", "palette", "report", "report-github", "about", "connect", "tour",
-                                   "directions", "uninstall", "shortcuts", "studio-dark", "settings:voice-dark",
-                                   "settings:area-dark", "report-dark", "connect-dark", "update", "updating",
-                                   "updated", "update-error", "small", "small-dark",
-                                   "studio-light", "settings-light", "report-light", "connect-light", "update-light"};
+        const QStringList steps = {"readme-dark",
+                                   "readme-light",
+                                   "studio",
+                                   "more",
+                                   "settings",
+                                   "settings:image",
+                                   "settings:motion",
+                                   "settings:app",
+                                   "settings:device",
+                                   "palette",
+                                   "report",
+                                   "report-github",
+                                   "about",
+                                   "connect",
+                                   "tour",
+                                   "directions",
+                                   "uninstall",
+                                   "shortcuts",
+                                   "studio-dark",
+                                   "settings:voice-dark",
+                                   "settings:area-dark",
+                                   "report-dark",
+                                   "connect-dark",
+                                   "update",
+                                   "updating",
+                                   "updated",
+                                   "update-error",
+                                   "small",
+                                   "small-dark",
+                                   "studio-light",
+                                   "settings-light",
+                                   "report-light",
+                                   "connect-light",
+                                   "update-light"};
         auto index = std::make_shared<int>(0);
         auto *timer = new QTimer(&app);
         timer->setInterval(1400);

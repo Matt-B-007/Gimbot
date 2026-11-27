@@ -77,8 +77,11 @@ private slots:
                 }
             }
             // Text on filled accent buttons: 7.2:1 for dark ink, 5.1:1 for white.
-            const double ink = contrast(theme->property("accentInk").value<QColor>(), theme->property("accent").value<QColor>());
-            QVERIFY2(ink >= (mode == 1 ? 7.2 : 5.1), qPrintable(QStringLiteral("%1 theme: button text on the accent is %2:1").arg(name).arg(ink, 0, 'f', 2)));
+            const double ink =
+                contrast(theme->property("accentInk").value<QColor>(), theme->property("accent").value<QColor>());
+            QVERIFY2(ink >= (mode == 1 ? 7.2 : 5.1),
+                     qPrintable(
+                         QStringLiteral("%1 theme: button text on the accent is %2:1").arg(name).arg(ink, 0, 'f', 2)));
         }
     }
 
@@ -102,7 +105,8 @@ private slots:
 
         // Each state draws something, and they all look different.
         QSet<QByteArray> seen;
-        for (auto s : {State::Idle, State::Active, State::Muted, State::Attention, State::Problem, State::Disconnected}) {
+        for (auto s :
+             {State::Idle, State::Active, State::Muted, State::Attention, State::Problem, State::Disconnected}) {
             for (const QColor &panel : {QColor("#232629"), QColor("#fcfcfc")}) {
                 const QImage img = trayicon::render(s, panel, 22);
                 QCOMPARE(img.size(), QSize(22, 22));
@@ -112,8 +116,9 @@ private slots:
                 seen.insert(bytes);
                 const QString out = qEnvironmentVariable("GIMBOT_TRAY_SHOTS");
                 if (!out.isEmpty())
-                    trayicon::render(s, panel, 64).save(QStringLiteral("%1/tray-%2-%3.png").arg(out, trayicon::name(s),
-                                                                                         panel.lightness() > 128 ? "dark" : "light"));
+                    trayicon::render(s, panel, 64)
+                        .save(QStringLiteral("%1/tray-%2-%3.png")
+                                  .arg(out, trayicon::name(s), panel.lightness() > 128 ? "dark" : "light"));
             }
         }
     }
@@ -122,7 +127,8 @@ private slots:
     {
         QTest::addColumn<QString>("in");
         QTest::addColumn<QString>("out");
-        QTest::newRow("home") << "Log: /home/matt/.local/state/gimbot/gimbot.log" << "Log: ~/.local/state/gimbot/gimbot.log";
+        QTest::newRow("home") << "Log: /home/matt/.local/state/gimbot/gimbot.log"
+                              << "Log: ~/.local/state/gimbot/gimbot.log";
         QTest::newRow("windows home") << R"(Z:\home\matt\Games\x.exe)" << R"(~\Games\x.exe)";
         QTest::newRow("windows profile") << R"(C:\users\matt\AppData)" << R"(~\AppData)";
         QTest::newRow("user") << "user matt logged in" << "user <user> logged in";

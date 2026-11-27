@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 import QtQuick
-import QtQuick.Controls
 import QtQml.Models
 import QtQuick.Layouts
 

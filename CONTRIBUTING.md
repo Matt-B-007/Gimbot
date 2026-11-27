@@ -23,9 +23,11 @@ hidden. Open an issue with the bug report form and attach the file.
 ## Style
 
 - **C++ 17 and Qt 6.** Nothing slow on the interface thread: camera calls
-  go through the worker thread, network through Qt's async APIs.
+  go through the worker thread, network through Qt's async APIs. Format
+  with `clang-format` (the style is in `.clang-format`).
 - **QML:** take colors, sizes and fonts from `Theme.qml`. Every text color
-  must pass 4.5:1 contrast in both themes (a test checks it).
+  must pass 4.5:1 contrast in both themes (a test checks it). qmllint must
+  report nothing; refer to objects by `id` rather than through `parent`.
 - **Words in the interface:** plain language, say what to do next, no
   jargon. Buttons say what they do ("Save to file", not "OK").
 - **Shell scripts:** bash, clean under shellcheck at every severity. Use

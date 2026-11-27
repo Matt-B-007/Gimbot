@@ -41,7 +41,8 @@ void rotateIfNeeded()
     const QString path = g_file->fileName();
     g_file->close();
     QFile::remove(path + "." + QString::number(kKeepFiles - 1));
-    for (int i = kKeepFiles - 2; i >= 1; --i) QFile::rename(path + "." + QString::number(i), path + "." + QString::number(i + 1));
+    for (int i = kKeepFiles - 2; i >= 1; --i)
+        QFile::rename(path + "." + QString::number(i), path + "." + QString::number(i + 1));
     QFile::rename(path, path + ".1");
     g_file->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
 }
@@ -77,8 +78,14 @@ QString stateDir()
     if (QStandardPaths::isTestModeEnabled()) base = QDir::homePath() + "/.qttest/state";
     return base + "/" + QCoreApplication::organizationName();
 }
-QString logDir() { return stateDir(); }
-QString logFile() { return logDir() + "/gimbot.log"; }
+QString logDir()
+{
+    return stateDir();
+}
+QString logFile()
+{
+    return logDir() + "/gimbot.log";
+}
 
 void install()
 {
@@ -96,7 +103,10 @@ void install()
     qInstallMessageHandler(handler);
 }
 
-void setVerbose(bool on) { g_verbose = on; }
+void setVerbose(bool on)
+{
+    g_verbose = on;
+}
 
 QStringList recent(int lines)
 {

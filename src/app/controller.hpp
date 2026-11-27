@@ -21,7 +21,8 @@
 #include <functional>
 #include <memory>
 
-class Controller : public QObject {
+class Controller : public QObject
+{
     Q_OBJECT
     Q_PROPERTY(bool connected READ connected NOTIFY connectedChanged)
     Q_PROPERTY(bool usbAvailable READ usbAvailable NOTIFY deviceChanged)
@@ -83,7 +84,7 @@ public:
     Q_INVOKABLE void nudge(double tilt, double pan);
     Q_INVOKABLE void stopMove();
     Q_INVOKABLE void recenter();
-    Q_INVOKABLE void aimAt(double x, double y); // point in the preview, 0..1
+    Q_INVOKABLE void aimAt(double x, double y);            // point in the preview, 0..1
     Q_INVOKABLE void aimAbsolute(double pan, double tilt); // degrees, screen frame
     Q_INVOKABLE void zoomBy(int delta);
 
@@ -111,9 +112,9 @@ public:
     Q_INVOKABLE void thumbnailSaved(int id);
 
     // One-shot camera actions.
-    Q_INVOKABLE void zoneStart(const QString &action);   // "use-current", "go", "reset"
+    Q_INVOKABLE void zoneStart(const QString &action); // "use-current", "go", "reset"
     Q_INVOKABLE void resetZone();
-    Q_INVOKABLE void startup(const QString &action);     // "use-current", "go", "reset"
+    Q_INVOKABLE void startup(const QString &action); // "use-current", "go", "reset"
     Q_INVOKABLE void resetImage();
     Q_INVOKABLE void factoryReset();
 
@@ -194,8 +195,8 @@ private:
     QString m_activeProfile;
     QTimer m_resumeTimer;
     QTimer m_backupTimer;
-    QVariantMap m_undo;          // settings to restore
-    QString m_undoProfile;       // deleted profile to restore
+    QVariantMap m_undo;    // settings to restore
+    QString m_undoProfile; // deleted profile to restore
     QVariantMap m_undoProfileData;
 
     QHash<QString, Setting> m_table;

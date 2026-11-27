@@ -55,7 +55,7 @@ Sheet {
             font.family: Theme.font
             font.pixelSize: Theme.small
             onToggled: details.text = platform.diagnostics(checked)
-            contentItem: Text { leftPadding: parent.indicator.width + 6; text: parent.text; font: parent.font; color: Theme.textMuted; verticalAlignment: Text.AlignVCenter }
+            contentItem: Text { leftPadding: serialBox.indicator.width + 6; text: serialBox.text; font: serialBox.font; color: Theme.textMuted; verticalAlignment: Text.AlignVCenter }
         }
     }
 

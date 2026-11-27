@@ -7,11 +7,11 @@
 #include "controller.hpp"
 #include "crashlog.hpp"
 #include "logger.hpp"
-#include "trayicon.hpp"
 #include "redact.hpp"
+#include "trayicon.hpp"
+#include "updater.hpp"
 #include <QDateTime>
 #include <QSaveFile>
-#include "updater.hpp"
 
 #include <QAction>
 #include <QActionGroup>
@@ -23,14 +23,14 @@
 #include <QDir>
 #include <QFile>
 #include <QIcon>
-#include <QRegularExpression>
 #include <QMenu>
+#include <QPalette>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QSysInfo>
 #include <QSystemTrayIcon>
 #include <QTimer>
-#include <QPalette>
 #include <QUrl>
 #include <QUrlQuery>
 
@@ -55,17 +55,25 @@ QString markerPath()
 
 Platform::Platform(Controller *cam, Updater *updater, const QString &repo, QObject *parent)
     : QObject(parent), m_cam(cam), m_updater(updater), m_repo(repo)
-{
-}
+{}
 
 Platform::~Platform()
 {
     if (!m_menuOwnedByTray) delete m_menu;
 }
 
-QString Platform::version() const { return QStringLiteral(GIMBOT_VERSION); }
-QString Platform::sdkVersion() const { return QStringLiteral(GIMBOT_SDK_VERSION); }
-QString Platform::qtVersion() const { return QString::fromLatin1(qVersion()); }
+QString Platform::version() const
+{
+    return QStringLiteral(GIMBOT_VERSION);
+}
+QString Platform::sdkVersion() const
+{
+    return QStringLiteral(GIMBOT_SDK_VERSION);
+}
+QString Platform::qtVersion() const
+{
+    return QString::fromLatin1(qVersion());
+}
 QString Platform::system() const
 {
     return QStringLiteral("%1, kernel %2, %3 (%4)")
@@ -81,7 +89,10 @@ bool Platform::kdeIntegration() const
     return false;
 #endif
 }
-QString Platform::repoUrl() const { return m_repo.isEmpty() ? QString() : "https://github.com/" + m_repo; }
+QString Platform::repoUrl() const
+{
+    return m_repo.isEmpty() ? QString() : "https://github.com/" + m_repo;
+}
 bool Platform::reduceMotion() const
 {
     const QString file = QStandardPaths::locate(QStandardPaths::GenericConfigLocation, QStringLiteral("kdeglobals"));
@@ -98,7 +109,10 @@ bool Platform::repoPublic() const
     return true;
 #endif
 }
-QString Platform::logFile() const { return Logger::logFile(); }
+QString Platform::logFile() const
+{
+    return Logger::logFile();
+}
 
 // ---------------------------------------------------------------- OBSBOT SDK folder
 
@@ -144,14 +158,16 @@ void Platform::checkForNewSdk()
     QString bestPath, bestVersion;
     const QString downloads = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
     QStringList candidates;
-    for (const auto &f : QDir(downloads).entryInfoList({"libdev*.zip"}, QDir::Files)) candidates << f.absoluteFilePath();
+    for (const auto &f : QDir(downloads).entryInfoList({"libdev*.zip"}, QDir::Files))
+        candidates << f.absoluteFilePath();
     for (const auto &sub : QDir(downloads).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot))
         for (const auto &f : QDir(sub.absoluteFilePath()).entryInfoList({"libdev*.zip"}, QDir::Files))
             candidates << f.absoluteFilePath();
     for (const auto &path : candidates) {
         const QString v = sdkVersionOf(path);
         if (v.isEmpty()) continue;
-        const bool newer = floor == QLatin1String("none") || floor == QLatin1String("unknown") || compareSdk(v, floor) > 0;
+        const bool newer =
+            floor == QLatin1String("none") || floor == QLatin1String("unknown") || compareSdk(v, floor) > 0;
         if (newer && (bestVersion.isEmpty() || compareSdk(v, bestVersion) > 0)) {
             bestPath = path;
             bestVersion = v;
@@ -216,7 +232,10 @@ void Platform::markRunning()
     if (f.open(QIODevice::WriteOnly)) f.write(QByteArray::number(QCoreApplication::applicationPid()));
 }
 
-void Platform::markCleanExit() { QFile::remove(markerPath()); }
+void Platform::markCleanExit()
+{
+    QFile::remove(markerPath());
+}
 
 void Platform::dismissCrash()
 {
@@ -285,7 +304,10 @@ void Platform::setupTray()
     auto *problemTimer = new QTimer(this);
     problemTimer->setSingleShot(true);
     problemTimer->setInterval(60 * 1000);
-    connect(problemTimer, &QTimer::timeout, this, [this] { m_problem = false; updateTrayState(); });
+    connect(problemTimer, &QTimer::timeout, this, [this] {
+        m_problem = false;
+        updateTrayState();
+    });
     connect(m_cam, &Controller::errorOccurred, this, [this, problemTimer] {
         m_problem = true;
         problemTimer->start();
@@ -374,8 +396,8 @@ void Platform::rebuildMenu()
         if (m_cam->trackingPaused()) m_menu->addAction(tr("Resume tracking"), m_cam, &Controller::resumeTracking);
         auto *track = m_menu->addMenu(tr("Tracking mode"));
         auto *group = new QActionGroup(track);
-        const QList<QPair<QString, int>> modes = {{tr("Person"), 2}, {tr("Group"), 1},     {tr("Hand"), 3},
-                                                  {tr("Desk"), 5},   {tr("Whiteboard"), 4}};
+        const QList<QPair<QString, int>> modes = {
+            {tr("Person"), 2}, {tr("Group"), 1}, {tr("Hand"), 3}, {tr("Desk"), 5}, {tr("Whiteboard"), 4}};
         const int shown = mode != 0 ? mode : v.value("lastTrackingMode").toInt();
         for (const auto &m : modes) {
             auto *a = track->addAction(m.first, this, [this, mode = m.second] { m_cam->set("mode", mode); });
@@ -439,13 +461,16 @@ QString Platform::diagnostics(bool includeSerial) const
 #ifndef GIMBOT_KDE_STATUS
 #define GIMBOT_KDE_STATUS "unknown"
 #endif
-    out << QStringLiteral("KDE integration: %1 (%2)").arg(kdeIntegration() ? "yes" : "no", QStringLiteral(GIMBOT_KDE_STATUS));
+    out << QStringLiteral("KDE integration: %1 (%2)")
+               .arg(kdeIntegration() ? "yes" : "no", QStringLiteral(GIMBOT_KDE_STATUS));
     out << QStringLiteral("System: %1").arg(system());
     out << QStringLiteral("Updates: %1, installed %2")
-               .arg(m_updater->channel() == 2 ? "beta" : m_updater->channel() == 1 ? "stable" : "off",
-                    m_updater->installType() == QLatin1String("aur") ? "from the AUR"
+               .arg(m_updater->channel() == 2   ? "beta"
+                    : m_updater->channel() == 1 ? "stable"
+                                                : "off",
+                    m_updater->installType() == QLatin1String("aur")      ? "from the AUR"
                     : m_updater->installType() == QLatin1String("script") ? "with install.sh"
-                                                                           : "by hand");
+                                                                          : "by hand");
     if (m_cam->connected()) {
         out << QStringLiteral("Camera: %1, firmware %2%3")
                    .arg(m_cam->model(), m_cam->firmware(),
@@ -483,7 +508,8 @@ QString Platform::reportText(const QString &title, const QString &description, b
 {
     QStringList out;
     out << QStringLiteral("Summary: %1").arg(title.trimmed().isEmpty() ? QStringLiteral("(none)") : title.trimmed());
-    out << QStringLiteral("What happened:") << (description.trimmed().isEmpty() ? QStringLiteral("(not described)") : description.trimmed());
+    out << QStringLiteral("What happened:")
+        << (description.trimmed().isEmpty() ? QStringLiteral("(not described)") : description.trimmed());
     out << QString() << diagnostics(includeSerial);
     return redactText(out.join('\n'), includeSerial);
 }
@@ -516,7 +542,10 @@ void Platform::showSavedReport()
     QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(m_lastReport).path()));
 }
 
-void Platform::copyToClipboard(const QString &text) { QGuiApplication::clipboard()->setText(text); }
+void Platform::copyToClipboard(const QString &text)
+{
+    QGuiApplication::clipboard()->setText(text);
+}
 
 bool Platform::openIssue(const QString &title, const QString &description, bool includeSerial)
 {
@@ -532,28 +561,38 @@ bool Platform::openIssue(const QString &title, const QString &description, bool 
     const QString body =
         QStringLiteral("### What happened?\n%1\n\n### Details\n```\n%2\n```\n\n"
                        "### Full report\nPlease attach `%3` (saved in %4) by dragging it into this box.\n")
-            .arg(description.trimmed().isEmpty() ? QStringLiteral("(describe the problem)") : redactText(description.trimmed(), includeSerial),
+            .arg(description.trimmed().isEmpty() ? QStringLiteral("(describe the problem)")
+                                                 : redactText(description.trimmed(), includeSerial),
                  header.join('\n'), QFileInfo(m_lastReport).fileName(),
                  redactText(QFileInfo(m_lastReport).path(), false));
     QUrl url(QStringLiteral("https://github.com/%1/issues/new").arg(m_repo));
     QUrlQuery q;
-    q.addQueryItem("title", title.trimmed().isEmpty() ? QStringLiteral("Problem report") : redactText(title.trimmed(), includeSerial));
+    q.addQueryItem("title", title.trimmed().isEmpty() ? QStringLiteral("Problem report")
+                                                      : redactText(title.trimmed(), includeSerial));
     q.addQueryItem("body", body);
     url.setQuery(q);
     return QDesktopServices::openUrl(url);
 }
 
-void Platform::openLogFolder() { QDesktopServices::openUrl(QUrl::fromLocalFile(Logger::logDir())); }
-void Platform::openUrl(const QString &url) { QDesktopServices::openUrl(QUrl(url)); }
+void Platform::openLogFolder()
+{
+    QDesktopServices::openUrl(QUrl::fromLocalFile(Logger::logDir()));
+}
+void Platform::openUrl(const QString &url)
+{
+    QDesktopServices::openUrl(QUrl(url));
+}
 
 // ---------------------------------------------------------------- D-Bus
 
 DBusService::DBusService(Controller *cam, Platform *platform, QObject *parent)
     : QObject(parent), m_cam(cam), m_platform(platform)
-{
-}
+{}
 
-void DBusService::Activate() { emit m_platform->showRequested(); }
+void DBusService::Activate()
+{
+    emit m_platform->showRequested();
+}
 
 QString DBusService::SaveReport()
 {
@@ -621,10 +660,12 @@ QVariantList Platform::previewChoices(const QCameraDevice &device) const
 QString Platform::formatLabel(int width, int height, int fps) const
 {
     QString res;
-    if (width == 3840 && height == 2160) res = QStringLiteral("4K");
-    else if (width * 9 == height * 16 && (height == 360 || height == 480 || height == 540 || height == 720 ||
-                                           height == 1080 || height == 1440))
+    if (width == 3840 && height == 2160)
+        res = QStringLiteral("4K");
+    else if (width * 9 == height * 16 &&
+             (height == 360 || height == 480 || height == 540 || height == 720 || height == 1080 || height == 1440))
         res = QStringLiteral("%1p").arg(height);
-    else res = QStringLiteral("%1×%2").arg(width).arg(height);
+    else
+        res = QStringLiteral("%1×%2").arg(width).arg(height);
     return fps > 0 ? tr("%1 · %2 fps").arg(res).arg(fps) : res;
 }

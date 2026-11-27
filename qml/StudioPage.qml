@@ -24,14 +24,14 @@ FocusScope {
     signal openSection(string section)
     signal openShortcuts()
 
-    readonly property alias preview: preview
+    readonly property alias preview: previewView
     readonly property bool wide: width >= 1080
 
     readonly property alias tourTargets: tourTargets
     QtObject {
         id: tourTargets
         property Item tracking: trackingCard
-        property Item preview: preview
+        property Item preview: previewView
         property Item presets: presetStrip
         property Item bar: topBar
     }
@@ -112,10 +112,10 @@ FocusScope {
 
         StatusStrip {
             Layout.fillWidth: true
-            previewError: preview.error
-            videoSize: preview.videoSize
-            videoFps: preview.videoFps
-            onRetryPreview: preview.retry()
+            previewError: previewView.error
+            videoSize: previewView.videoSize
+            videoFps: previewView.videoFps
+            onRetryPreview: previewView.retry()
             onOpenArea: root.openSection("area")
         }
 
@@ -201,7 +201,7 @@ FocusScope {
                     Layout.alignment: Qt.AlignTop
                     spacing: 16
                     Preview {
-                        id: preview
+                        id: previewView
                         Layout.fillWidth: true
                         Layout.preferredHeight: width * 9 / 16
                         windowVisible: root.windowVisible && root.visible

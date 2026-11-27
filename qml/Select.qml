@@ -8,7 +8,7 @@ ComboBox {
     // Inside a SettingRow, screen readers use the row's label.
     property string accessibleName: ""
     Accessible.name: accessibleName.length > 0 ? accessibleName
-                   : (parent && parent.parent && parent.parent.label !== undefined ? parent.parent.label : displayText)
+                   : (parent && parent.parent && parent.parent.label !== undefined ? parent.parent.label : displayText) // qmllint disable missing-property
     implicitHeight: 38
     implicitWidth: 220
     font.family: Theme.font

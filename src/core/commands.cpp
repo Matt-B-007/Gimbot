@@ -61,18 +61,27 @@ namespace {
 
 bool onOff(const std::string &s, bool &out)
 {
-    if (s == "on" || s == "1" || s == "true" || s == "yes") { out = true; return true; }
-    if (s == "off" || s == "0" || s == "false" || s == "no") { out = false; return true; }
+    if (s == "on" || s == "1" || s == "true" || s == "yes") {
+        out = true;
+        return true;
+    }
+    if (s == "off" || s == "0" || s == "false" || s == "no") {
+        out = false;
+        return true;
+    }
     return false;
 }
 
 bool parseMode(const std::string &s, Mode &m)
 {
-    static const std::pair<const char *, Mode> modes[] = {
-        {"off", Mode::Off},   {"person", Mode::Person}, {"group", Mode::Group},
-        {"hand", Mode::Hand}, {"desk", Mode::Desk},     {"whiteboard", Mode::Whiteboard}};
+    static const std::pair<const char *, Mode> modes[] = {{"off", Mode::Off},     {"person", Mode::Person},
+                                                          {"group", Mode::Group}, {"hand", Mode::Hand},
+                                                          {"desk", Mode::Desk},   {"whiteboard", Mode::Whiteboard}};
     for (auto &x : modes)
-        if (s == x.first) { m = x.second; return true; }
+        if (s == x.first) {
+            m = x.second;
+            return true;
+        }
     return false;
 }
 
@@ -127,13 +136,15 @@ int runCommand(Camera &cam, const std::vector<std::string> &args, std::string &o
         if (cam.position(pos)) {
             axis::Orientation o;
             o.mirrored = cam.status().mirrored;
-            out += fmt("Gimbal:    tilt %+.1f°, pan %+.1f° (up and right are +)\n",
-                       axis::screenFromPitch(pos.pitch, o), axis::screenFromYaw(pos.yaw, o));
+            out += fmt("Gimbal:    tilt %+.1f°, pan %+.1f° (up and right are +)\n", axis::screenFromPitch(pos.pitch, o),
+                       axis::screenFromYaw(pos.yaw, o));
         }
         out += fmt("FOV:       %s\n", s.fov >= 0 && s.fov < 3 ? fovs[s.fov] : "?");
         out += fmt("HDR:       %s\nMirror:    %s\n", s.hdr ? "on" : "off", s.mirrored ? "on" : "off");
-        if (s.autoFocus) out += fmt("Focus:     auto%s\n", s.faceFocus ? " (face)" : "");
-        else out += fmt("Focus:     manual %d\n", s.manualFocus);
+        if (s.autoFocus)
+            out += fmt("Focus:     auto%s\n", s.faceFocus ? " (face)" : "");
+        else
+            out += fmt("Focus:     manual %d\n", s.manualFocus);
         return 0;
     }
     if (cmd == "sleep") return done(cam.setAsleep(true));
@@ -186,8 +197,8 @@ int runCommand(Camera &cam, const std::vector<std::string> &args, std::string &o
             auto list = cam.presets();
             if (list.empty()) out += "No presets saved.\n";
             for (auto &p : list)
-                out += fmt("%d  %-20s pitch %.1f°  yaw %.1f°  zoom %.2f\n", p.id, p.name.c_str(), p.pitch, p.yaw,
-                           p.zoom);
+                out +=
+                    fmt("%d  %-20s pitch %.1f°  yaw %.1f°  zoom %.2f\n", p.id, p.name.c_str(), p.pitch, p.yaw, p.zoom);
             return 0;
         }
         if (args.size() < 3) return usage();

@@ -174,6 +174,7 @@ ColumnLayout {
         }
 
         AbstractButtonLike {
+            id: saveTile
             visible: cam.presets.length < cam.maxPresets
             Layout.fillWidth: true
             Layout.preferredWidth: 1
@@ -184,9 +185,9 @@ ColumnLayout {
             onClicked: root.saveRequested()
             background: Rectangle {
                 radius: 14
-                color: parent.hovered ? Theme.hover : "transparent"
+                color: saveTile.hovered ? Theme.hover : "transparent"
                 border.width: 1.5
-                border.color: parent.hovered ? Theme.accent : Theme.borderStrong
+                border.color: saveTile.hovered ? Theme.accent : Theme.borderStrong
                 // Dashed look without images: a second inset border.
                 Rectangle { anchors.fill: parent; anchors.margins: 4; radius: 11; color: "transparent"; border.width: 1; border.color: Theme.border }
             }

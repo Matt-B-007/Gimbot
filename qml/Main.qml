@@ -50,7 +50,7 @@ ApplicationWindow {
 
     // Used by --screenshots to visit each screen.
     function showScreen(name) {
-        palette.close(); report.close(); about.close(); shortcutsDialog.close(); tour.close(); directionCheck.close(); uninstallDialog.close()
+        commandPalette.close(); report.close(); about.close(); shortcutsDialog.close(); tour.close(); directionCheck.close(); uninstallDialog.close()
         if (name !== "updating" && name !== "updated") updateDialog.close()
         cam.set("theme", name.endsWith("-dark") ? 1 : name.endsWith("-light") ? 2 : 0) // same result every run
         if (name.endsWith("-dark")) name = name.replace("-dark", "")
@@ -60,7 +60,7 @@ ApplicationWindow {
         const parts = name.split(":")
         if (parts[0] === "settings") { page = "settings"; settings.scrollTo(parts[1] || "area") }
         else page = "studio"
-        if (name === "palette") palette.open()
+        if (name === "palette") commandPalette.open()
         if (name === "report") report.open()
         if (name === "report-github") { report.open(); report.showGithubWarning() }
         if (name === "about") about.open()
@@ -128,7 +128,7 @@ ApplicationWindow {
         focus: visible
         windowVisible: window.visible
         Behavior on opacity { NumberAnimation { duration: Theme.normal } }
-        onOpenPalette: palette.open()
+        onOpenPalette: commandPalette.open()
         onOpenSettings: window.openSettings()
         onOpenReport: report.open()
         onOpenUpdate: updateDialog.open()
@@ -194,7 +194,7 @@ ApplicationWindow {
     Toasts { id: toasts; anchors.fill: parent; z: 100 }
 
     CommandPalette {
-        id: palette
+        id: commandPalette
         actions: {
             let a = [
                 { title: cam.values.mode !== 0 ? qsTr("Turn tracking off") : qsTr("Turn tracking on"), hint: "Ctrl T", icon: "person", keywords: "tracking switch", run: () => cam.toggleTracking() },
@@ -272,7 +272,7 @@ ApplicationWindow {
     }
 
     // ---------------------------------------------------------------- shortcuts
-    Shortcut { sequence: "Ctrl+K"; onActivated: palette.open() }
+    Shortcut { sequence: "Ctrl+K"; onActivated: commandPalette.open() }
     Shortcut { sequence: "Ctrl+,"; onActivated: window.openSettings() }
     Shortcut { sequence: "Ctrl+T"; enabled: cam.connected; onActivated: cam.toggleTracking() }
     Shortcut { sequence: "Ctrl+L"; enabled: cam.connected; onActivated: cam.set("asleep", !cam.values.asleep) }

@@ -16,12 +16,12 @@ jobs:
     # findings can change (shellcheck, actionlint) are pinned below.
     container: archlinux:latest
     steps:
-      - name: Install build tools and pinned checkers
+      - name: Install build tools and pinned checkers (shellcheck, actionlint, clang-format)
         run: |
           pacman -Syu --noconfirm --needed base-devel cmake extra-cmake-modules git dbus python-pip \
             qt6-base qt6-declarative qt6-multimedia qt6-multimedia-ffmpeg qt6-svg \
             kcoreaddons kcrash kglobalaccel kstatusnotifieritem
-          pip install --break-system-packages shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25
+          pip install --break-system-packages shellcheck-py==0.11.0.1 actionlint-py==1.7.12.25 clang-format==23.1.5
       - uses: actions/checkout@v7
       - name: Run every check (bash scripts/check.sh)
         run: bash scripts/check.sh

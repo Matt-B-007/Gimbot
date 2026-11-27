@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 #include "updater.hpp"
 
-#include <QFile>
-#include <QDir>
-#include <QFileInfo>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -77,8 +77,14 @@ int Updater::compareVersions(const QString &a, const QString &b)
     return xa.size() == xb.size() ? 0 : (xa.size() < xb.size() ? -1 : 1);
 }
 
-void Updater::check() { startCheck(true); }
-void Updater::autoCheck() { startCheck(false); }
+void Updater::check()
+{
+    startCheck(true);
+}
+void Updater::autoCheck()
+{
+    startCheck(false);
+}
 
 void Updater::startCheck(bool manual)
 {
@@ -156,38 +162,42 @@ void Updater::fetch(const QString &url, bool json, std::function<void(bool, cons
 void Updater::fetchWithCurl(const QString &url, bool json, int dohIndex,
                             std::function<void(bool, const QByteArray &, const QString &)> done)
 {
-    static const QStringList doh = {QStringLiteral("https://1.1.1.1/dns-query"), QStringLiteral("https://8.8.8.8/dns-query")};
+    static const QStringList doh = {QStringLiteral("https://1.1.1.1/dns-query"),
+                                    QStringLiteral("https://8.8.8.8/dns-query")};
     const QString curl = QStandardPaths::findExecutable("curl");
     if (dohIndex == 0) m_curlExit = 0;
     if (curl.isEmpty() || dohIndex >= doh.size()) {
         // 7 = couldn't connect, 28 = timed out: the backup couldn't get out
         // either, so it's the connection, not just DNS.
         if (m_curlExit == 7 || m_curlExit == 28)
-            done(false, {}, tr("This computer isn't connected to the internet right now, so Gimbot can't reach GitHub."));
+            done(false, {},
+                 tr("This computer isn't connected to the internet right now, so Gimbot can't reach GitHub."));
         else
-            done(false, {}, tr("This computer can't look up web addresses (DNS isn't working), so Gimbot can't reach GitHub. "
-                               "Other apps are probably affected too."));
+            done(false, {},
+                 tr("This computer can't look up web addresses (DNS isn't working), so Gimbot can't reach GitHub. "
+                    "Other apps are probably affected too."));
         return;
     }
     auto *proc = new QProcess(this);
-    connect(proc, &QProcess::finished, this, [this, proc, url, json, dohIndex, done](int code, QProcess::ExitStatus status) {
-        proc->deleteLater();
-        if (status == QProcess::NormalExit && code == 0) {
-            qInfo() << "Fetched" << url << "through" << doh[dohIndex] << "because the computer's DNS failed";
-            m_dnsFallback = true;
-            done(true, proc->readAllStandardOutput(), QString());
-            return;
-        }
-        // Say why, so a bug report shows the cause (curl exit codes: 6 name
-        // lookup, 7 couldn't connect, 28 timeout, 35/60 TLS problem).
-        const QString why = QString::fromUtf8(proc->readAllStandardError()).trimmed().section('\n', -1);
-        m_curlExit = status == QProcess::NormalExit ? code : -1;
-        qWarning().noquote() << QStringLiteral("Backup lookup through %1 failed: curl exit %2%3")
-                                    .arg(doh[dohIndex])
-                                    .arg(m_curlExit)
-                                    .arg(why.isEmpty() ? QString() : ": " + why);
-        fetchWithCurl(url, json, dohIndex + 1, done);
-    });
+    connect(proc, &QProcess::finished, this,
+            [this, proc, url, json, dohIndex, done](int code, QProcess::ExitStatus status) {
+                proc->deleteLater();
+                if (status == QProcess::NormalExit && code == 0) {
+                    qInfo() << "Fetched" << url << "through" << doh[dohIndex] << "because the computer's DNS failed";
+                    m_dnsFallback = true;
+                    done(true, proc->readAllStandardOutput(), QString());
+                    return;
+                }
+                // Say why, so a bug report shows the cause (curl exit codes: 6 name
+                // lookup, 7 couldn't connect, 28 timeout, 35/60 TLS problem).
+                const QString why = QString::fromUtf8(proc->readAllStandardError()).trimmed().section('\n', -1);
+                m_curlExit = status == QProcess::NormalExit ? code : -1;
+                qWarning().noquote() << QStringLiteral("Backup lookup through %1 failed: curl exit %2%3")
+                                            .arg(doh[dohIndex])
+                                            .arg(m_curlExit)
+                                            .arg(why.isEmpty() ? QString() : ": " + why);
+                fetchWithCurl(url, json, dohIndex + 1, done);
+            });
     connect(proc, &QProcess::errorOccurred, this, [this, proc, url, json, done](QProcess::ProcessError e) {
         if (e != QProcess::FailedToStart) return; // finished() handles the rest
         qWarning() << "Couldn't run curl for the backup lookup";
@@ -350,7 +360,10 @@ QString Updater::aurCommand() const
     return m_current.contains('-') ? QStringLiteral("paru -Syu gimbot-beta") : QStringLiteral("paru -Syu gimbot");
 }
 
-void Updater::rollback() { run("rollback", {"--gui", "--rollback"}); }
+void Updater::rollback()
+{
+    run("rollback", {"--gui", "--rollback"});
+}
 
 // ---------------------------------------------------------------- installing
 
@@ -392,17 +405,17 @@ void Updater::run(const QString &action, const QStringList &args)
         if (status == QProcess::NormalExit && code == 0) {
             m_installState = "done";
             m_progress = 100;
-            m_status = m_action == "uninstall" ? tr("Gimbot is uninstalled")
-                       : m_action == "rebuild" ? tr("Gimbot is rebuilt with the new SDK")
+            m_status = m_action == "uninstall"  ? tr("Gimbot is uninstalled")
+                       : m_action == "rebuild"  ? tr("Gimbot is rebuilt with the new SDK")
                        : m_action == "rollback" ? tr("Went back to the previous version")
-                                               : tr("Gimbot %1 is installed").arg(m_latest);
+                                                : tr("Gimbot %1 is installed").arg(m_latest);
             qInfo().noquote() << m_action << "finished";
         } else {
             m_installState = "failed";
             if (m_error.isEmpty())
-                m_error = code == 3 ? tr("The OBSBOT SDK zip wasn't found.")
+                m_error = code == 3                 ? tr("The OBSBOT SDK zip wasn't found.")
                           : m_action == "uninstall" ? tr("Uninstalling didn't finish.")
-                          : m_action == "rollback" ? tr("Going back didn't finish.")
+                          : m_action == "rollback"  ? tr("Going back didn't finish.")
                                                     : tr("The update didn't finish.");
             qWarning() << m_action << "failed:" << m_error;
         }

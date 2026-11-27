@@ -12,9 +12,9 @@ namespace settingsstore {
 constexpr int kCurrentVersion = 3;
 
 struct Result {
-    int from = 0;          // version found (0 = before versions existed)
+    int from = 0; // version found (0 = before versions existed)
     bool newInstall = false;
-    bool newer = false;    // written by a newer Gimbot (e.g. after Go back)
+    bool newer = false; // written by a newer Gimbot (e.g. after Go back)
 };
 
 // Bring the settings up to kCurrentVersion.

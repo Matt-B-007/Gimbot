@@ -32,7 +32,7 @@ Sheet {
         text: qsTr("Also delete my Gimbot settings, logs and the saved OBSBOT SDK")
         font.family: Theme.font
         font.pixelSize: Theme.fontSize - 1
-        contentItem: Text { leftPadding: parent.indicator.width + 6; text: parent.text; font: parent.font; color: Theme.text; wrapMode: Text.WordWrap; verticalAlignment: Text.AlignVCenter }
+        contentItem: Text { leftPadding: purge.indicator.width + 6; text: purge.text; font: purge.font; color: Theme.text; wrapMode: Text.WordWrap; verticalAlignment: Text.AlignVCenter }
         Layout.fillWidth: true
     }
     Text {

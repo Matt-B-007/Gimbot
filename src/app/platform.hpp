@@ -5,9 +5,9 @@
 // and plain Qt otherwise.
 #pragma once
 
-#include <QDBusContext>
 #include <QCameraDevice>
 #include <QCameraFormat>
+#include <QDBusContext>
 #include <QObject>
 #include <QStringList>
 
@@ -16,7 +16,8 @@ class Updater;
 class QMenu;
 class QSystemTrayIcon;
 
-class Platform : public QObject {
+class Platform : public QObject
+{
     Q_OBJECT
     Q_PROPERTY(QString version READ version CONSTANT)
     Q_PROPERTY(QString sdkVersion READ sdkVersion CONSTANT)
@@ -136,7 +137,8 @@ private:
 };
 
 // Exposed on the session bus as io.github.Matt_B_007.Gimbot at /Gimbot.
-class DBusService : public QObject, protected QDBusContext {
+class DBusService : public QObject, protected QDBusContext
+{
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "io.github.Matt_B_007.Gimbot1")
 public:

@@ -7,7 +7,8 @@
 #include <QStandardPaths>
 #include <QTest>
 
-class ControllerTest : public QObject {
+class ControllerTest : public QObject
+{
     Q_OBJECT
     Controller *cam = nullptr;
 
@@ -121,7 +122,7 @@ private slots:
         QCOMPARE(cam->presets()[0].toMap()["id"].toInt(), second);
         QCOMPARE(cam->presets()[1].toMap()["id"].toInt(), first);
         QCOMPARE(cam->presets()[1].toMap()["index"].toInt(), 1); // Ctrl+2 follows the new order
-        cam->movePreset(first, -5);                                // clamped to the start
+        cam->movePreset(first, -5);                              // clamped to the start
         QCOMPARE(cam->presets()[0].toMap()["id"].toInt(), first);
     }
 

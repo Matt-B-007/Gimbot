@@ -17,7 +17,10 @@ namespace t2 {
 
 namespace {
 
-bool ok(int32_t r) { return r == RM_RET_OK; }
+bool ok(int32_t r)
+{
+    return r == RM_RET_OK;
+}
 
 bool isTiny2Family(const std::shared_ptr<Device> &d)
 {
@@ -77,7 +80,8 @@ void sdkLog(int32_t lvl, const char *msg, va_list args, void *)
     std::vfprintf(stderr, msg, args);
 }
 
-class SdkCamera final : public Camera {
+class SdkCamera final : public Camera
+{
 public:
     explicit SdkCamera(std::shared_ptr<Device> d) : dev_(std::move(d))
     {
@@ -204,8 +208,8 @@ public:
     bool move(double pitchSpeed, double yawSpeed) override
     {
         if (pitchSpeed == 0 && yawSpeed == 0) return ok(dev_->aiSetGimbalStop());
-        return ok(dev_->aiSetGimbalSpeedCtrlR(std::clamp(pitchSpeed, -90.0, 90.0), std::clamp(yawSpeed, -180.0, 180.0),
-                                              0.0));
+        return ok(
+            dev_->aiSetGimbalSpeedCtrlR(std::clamp(pitchSpeed, -90.0, 90.0), std::clamp(yawSpeed, -180.0, 180.0), 0.0));
     }
     bool moveTo(float pitch, float yaw, float speed = 0) override
     {
@@ -266,7 +270,10 @@ public:
         dev_->cameraGetFocusAbsolute(focus, af);
         return ok(dev_->cameraSetFocusAbsolute(focus, on));
     }
-    bool setManualFocus(int value) override { return ok(dev_->cameraSetFocusAbsolute(std::clamp(value, 0, 100), false)); }
+    bool setManualFocus(int value) override
+    {
+        return ok(dev_->cameraSetFocusAbsolute(std::clamp(value, 0, 100), false));
+    }
     bool setFaceFocus(bool on) override { return ok(dev_->cameraSetFaceFocusR(on)); }
     bool setFaceExposure(bool on) override { return ok(dev_->cameraSetFaceAER(on ? 1 : 0)); }
     bool setAntiFlicker(int mode) override { return ok(dev_->cameraSetAntiFlickR(std::clamp(mode, 0, 3))); }
@@ -461,7 +468,10 @@ std::vector<std::string> Discovery::cameras()
     return out;
 }
 
-void Discovery::setVerbose(bool on) { g_verbose = on; }
+void Discovery::setVerbose(bool on)
+{
+    g_verbose = on;
+}
 
 std::unique_ptr<Camera> openSdkCamera(const std::string &serial)
 {
@@ -470,7 +480,10 @@ std::unique_ptr<Camera> openSdkCamera(const std::string &serial)
         d = Devices::get().getDevBySn(serial);
     } else {
         for (auto &x : Devices::get().getDevList())
-            if (isTiny2Family(x)) { d = x; break; }
+            if (isTiny2Family(x)) {
+                d = x;
+                break;
+            }
     }
     if (!isTiny2Family(d)) return nullptr;
     return std::make_unique<SdkCamera>(d);
