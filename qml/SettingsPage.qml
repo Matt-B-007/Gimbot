@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
 import QtCore
 import QtQuick.Layouts
+import Gimbot
 
-// Every camera and app setting, grouped into sections with a side menu.
+// Every camera and app setting, in seven groups with a side menu.
 Rectangle {
     id: root
     color: Theme.bg
@@ -21,14 +23,17 @@ Rectangle {
     signal openDirectionCheck()
     signal openUninstall()
 
-    readonly property bool connected: cam.connected
-    readonly property var v: cam.values
+    readonly property bool connected: Cam.connected
+    readonly property var v: Cam.values
     readonly property bool anyVoice: v.voice0 || v.voice1 || v.voice2 || v.voice3 || v.voice4 || v.voice5 || v.voice6
 
-    function scrollTo(name) {
+    function scrollTo(name, groupTop) { // groupTop: the side menu, which goes to the top of a group
+        for (let pass = groupTop ? 1 : 0; pass < 2; ++pass)
         for (let i = 0; i < sections.children.length; ++i) {
             const s = sections.children[i]
-            if (s.sectionId === name) {
+            // A section by its own name first ("app" is the App card, though
+            // Profiles sits above it in the same group); else the group's first.
+            if (pass === 0 ? s.sectionId === name : s.navGroup === name) {
                 scrollAnim.to = Math.min(s.y, Math.max(0, flick.contentHeight - flick.height))
                 scrollAnim.restart()
                 return
@@ -37,22 +42,20 @@ Rectangle {
     }
 
     readonly property var navItems: [
-        { id: "area", label: qsTr("Tracking area"), icon: "area" },
-        { id: "startup", label: qsTr("Startup and power"), icon: "power" },
-        { id: "voice", label: qsTr("Audio and voice"), icon: "mic" },
+        { id: "camera", label: qsTr("Camera"), icon: "camera" },
+        { id: "tracking", label: qsTr("Tracking"), icon: "area" },
         { id: "image", label: qsTr("Image"), icon: "sun" },
-        { id: "motion", label: qsTr("Movement and zoom"), icon: "crosshair" },
+        { id: "voice", label: qsTr("Microphone and voice"), icon: "mic" },
         { id: "gestures", label: qsTr("Gestures"), icon: "hand" },
-        { id: "profiles", label: qsTr("Profiles"), icon: "layers" },
-        { id: "app", label: qsTr("App"), icon: "sliders" },
-        { id: "device", label: qsTr("Device"), icon: "camera" }
+        { id: "startup", label: qsTr("Startup and sleep"), icon: "power" },
+        { id: "app", label: qsTr("App and updates"), icon: "sliders" }
     ]
     // Which section is in view, for highlighting the side menu.
     readonly property string currentSection: {
-        let current = "area"
+        let current = "camera"
         for (let i = 0; i < sections.children.length; ++i) {
             const s = sections.children[i]
-            if (s.sectionId && s.y - 40 <= flick.contentY) current = s.sectionId
+            if (s.sectionId && s.y - 40 <= flick.contentY) current = s.navGroup
         }
         return current
     }
@@ -82,7 +85,7 @@ Rectangle {
                     spacing: 8
                     Rectangle { implicitWidth: 8; implicitHeight: 8; radius: 4; color: root.connected ? Theme.success : Theme.textFaint }
                     Text {
-                        text: root.connected ? qsTr("%1 · detected automatically").arg(cam.model) : qsTr("No camera connected")
+                        text: root.connected ? qsTr("%1 · detected automatically").arg(Cam.model) : qsTr("No camera connected")
                         color: Theme.text
                         font.family: Theme.font
                         font.pixelSize: Theme.small + 1
@@ -128,7 +131,7 @@ Rectangle {
                         border.width: navItem.visualFocus ? 2 : 0
                         border.color: Theme.accent
                     }
-                    onClicked: root.scrollTo(modelData.id)
+                    onClicked: root.scrollTo(modelData.id, true)
                     RowLayout {
                         anchors.fill: parent
                         anchors.leftMargin: 12
@@ -163,16 +166,167 @@ Rectangle {
                     width: Math.min(flick.width - 48, 860)
                     spacing: 20
 
+                    // ------------------------------------------------ device
+                    Section {
+                        sectionId: "device"
+                        navGroup: "camera"
+                        title: qsTr("Camera")
+                        GridLayout {
+                            Layout.fillWidth: true
+                            columns: 2
+                            columnSpacing: 16
+                            rowSpacing: 14
+                            Repeater {
+                                model: [{ k: qsTr("Model"), v: root.connected ? Cam.model : "—" },
+                                        { k: qsTr("Serial number"), v: root.connected ? Cam.serial : "—" },
+                                        { k: qsTr("Firmware"), v: root.connected ? Cam.firmware : "—" },
+                                        { k: qsTr("Firmware updates"), v: qsTr("OBSBOT Center on Windows or macOS (the SDK can't update firmware)") },
+                                        { k: qsTr("Gimbot"), v: Platform.version }]
+                                ColumnLayout {
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 1
+                                    spacing: 2
+                                    Text { text: parent.modelData.k; color: Theme.textMuted; font.family: Theme.font; font.pixelSize: Theme.small }
+                                    Text {
+                                        text: parent.modelData.v
+                                        color: Theme.text
+                                        font.family: Theme.font
+                                        font.pixelSize: Theme.fontSize
+                                        wrapMode: Text.WordWrap
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                            }
+                        }
+                        SettingRow {
+                            id: sdkRow
+                            readonly property string saved: Platform.savedSdk
+                            readonly property string savedVersion: saved.replace(/^libdev_?v?/, "").replace(/\.zip$/, "")
+                            readonly property bool newer: saved.length > 0 && savedVersion !== Platform.sdkVersion
+                            label: qsTr("OBSBOT SDK %1").arg(Platform.sdkVersion)
+                            description: saved.length > 0
+                                ? (newer ? qsTr("Saved: %1 (newer than this build). Rebuild Gimbot to use it.").arg(saved)
+                                         : qsTr("Saved in Gimbot's folder: %1. You can delete it from Downloads.").arg(saved))
+                                : qsTr("No SDK saved in Gimbot's folder yet. Add it so updates work without your Downloads folder.")
+                            Btn { text: qsTr("Open folder"); iconName: "folder"; variant: "ghost"; compact: true; onClicked: Platform.openSdkFolder() }
+                            Btn { text: qsTr("Add SDK…"); iconName: "plus"; compact: true; onClicked: sdkDialog.open() }
+                            Btn {
+                                visible: sdkRow.newer && Updater.canInstall
+                                text: qsTr("Rebuild")
+                                iconName: "refresh"
+                                variant: "primary"
+                                compact: true
+                                onClicked: { Updater.rebuild(); root.openUpdate() }
+                            }
+                        }
+                        SettingRow {
+                            label: qsTr("Reset to factory settings")
+                            description: qsTr("Erases presets and every camera setting")
+                            divider: false
+                            Btn { text: qsTr("Reset camera…"); variant: "danger"; compact: true; enabled: root.connected; onClicked: root.confirmFactoryReset() }
+                        }
+                    }
+
+                    // ------------------------------------------------ movement
+                    Section {
+                        sectionId: "motion"
+                        navGroup: "camera"
+                        title: qsTr("Movement and zoom")
+                        SliderRow {
+                            Layout.fillWidth: true
+                            label: qsTr("Zoom speed")
+                            from: 0; to: 10; stepSize: 1
+                            value: root.v.zoomSpeed
+                            valueText: root.v.zoomSpeed === 0 ? qsTr("Camera default") : root.v.zoomSpeed + " / 10"
+                            onMoved: (x) => Cam.set("zoomSpeed", Math.round(x))
+                        }
+                        SliderRow {
+                            Layout.fillWidth: true
+                            label: qsTr("Manual pan and tilt speed")
+                            from: 10; to: 120; stepSize: 5
+                            value: root.v.gimbalSpeed
+                            valueText: root.v.gimbalSpeed + "°/s"
+                            onMoved: (x) => Cam.set("gimbalSpeed", Math.round(x))
+                        }
+                        SettingRow {
+                            label: qsTr("Movement")
+                            description: qsTr("How smoothly the camera glides for double-click aiming, presets and the arrow keys. The aim pad follows your hand directly.")
+                            Segmented {
+                                implicitWidth: 340
+                                stretch: true
+                                options: [qsTr("Fast"), qsTr("Normal"), qsTr("Smooth"), qsTr("Cinematic")]
+                                currentIndex: root.v.smoothness
+                                onActivated: (i) => Cam.set("smoothness", i)
+                            }
+                        }
+                        SettingRow {
+                            label: qsTr("Camera mounted upside down")
+                            description: qsTr("Tells the camera to reverse its turning direction")
+                            Toggle { checked: root.v.yawReverse; onToggled: Cam.set("yawReverse", checked) }
+                        }
+
+                        Label2 { text: qsTr("Advanced"); Layout.topMargin: 8 }
+                        SettingRow {
+                            label: qsTr("Check movement directions")
+                            description: qsTr("Up should move the camera up and Right should move it right. If they don't, this fixes it in two steps.")
+                            Btn { text: qsTr("Check…"); iconName: "move"; compact: true; enabled: root.connected; onClicked: root.openDirectionCheck() }
+                        }
+                        SettingRow {
+                            label: qsTr("Flip left and right")
+                            description: qsTr("For every control: arrow keys, the aim pad, double-click aiming and dragging. Normally off.")
+                            Toggle { checked: root.v.invertPan; onToggled: Cam.set("invertPan", checked) }
+                        }
+                        SettingRow {
+                            label: qsTr("Flip up and down")
+                            description: qsTr("For every control. Normally off.")
+                            divider: false
+                            Toggle { checked: root.v.invertTilt; onToggled: Cam.set("invertTilt", checked) }
+                        }
+                    }
+
+                    // ================================================ TRACKING
+                    // ------------------------------------------------ tracking
+                    Section {
+                        sectionId: "tracking"
+                        title: qsTr("Tracking")
+                        subtitle: qsTr("How the camera behaves while it follows you.")
+                        SettingRow {
+                            label: qsTr("Zoom in automatically while tracking")
+                            Toggle { checked: root.v.autoZoom; onToggled: Cam.set("autoZoom", checked) }
+                        }
+                        SettingRow {
+                            label: qsTr("Resume tracking by itself")
+                            description: qsTr("After you move the camera by hand, turn tracking back on once you stop")
+                            Toggle { checked: root.v.autoResume; onToggled: Cam.set("autoResume", checked) }
+                        }
+                        SliderRow {
+                            Layout.fillWidth: true
+                            visible: root.v.autoResume
+                            label: qsTr("Resume after")
+                            from: 2; to: 30; stepSize: 1
+                            value: root.v.autoResumeSeconds
+                            valueText: qsTr("%1 s").arg(root.v.autoResumeSeconds)
+                            onMoved: (x) => Cam.set("autoResumeSeconds", Math.round(x))
+                        }
+                    }
+
                     // ------------------------------------------------ tracking area
                     Section {
                         sectionId: "area"
+                        navGroup: "tracking"
                         title: qsTr("Tracking area")
                         subtitle: qsTr("Keep tracking inside a set area, so the camera never turns toward a window or a door.")
+                        SettingRow {
+                            label: qsTr("Guide light while adjusting the tracking area")
+                            description: qsTr("The camera's light shows a pattern while you change the area")
+                            Toggle { checked: root.v.guideLight; onToggled: Cam.set("guideLight", checked) }
+                        }
                         headerExtras: Toggle {
                             checked: root.v.zoneEnabled
                             enabled: root.connected
                             Accessible.name: qsTr("Limit tracking to an area")
-                            onToggled: cam.set("zoneEnabled", checked)
+                            onToggled: Cam.set("zoneEnabled", checked)
                         }
 
                         Rectangle { // picture of the area
@@ -209,8 +363,8 @@ Rectangle {
                                 width: 12; height: 12; radius: 6
                                 color: Theme.text
                                 // The area uses the SDK's frame: yaw + is your right, pitch + is down.
-                                x: parent.width * (cam.rawYaw + parent.yawRange) / (2 * parent.yawRange) - 6
-                                y: parent.height * (cam.rawPitch + parent.pitchRange) / (2 * parent.pitchRange) - 6
+                                x: parent.width * (Cam.rawYaw + parent.yawRange) / (2 * parent.yawRange) - 6
+                                y: parent.height * (Cam.rawPitch + parent.pitchRange) / (2 * parent.pitchRange) - 6
                             }
                             Text { x: 10; anchors.bottom: parent.bottom; anchors.bottomMargin: 8; text: qsTr("Your left"); color: Theme.textFaint; font.family: Theme.font; font.pixelSize: 11 }
                             Text { anchors.right: parent.right; anchors.rightMargin: 10; anchors.bottom: parent.bottom; anchors.bottomMargin: 8; text: qsTr("Your right"); color: Theme.textFaint; font.family: Theme.font; font.pixelSize: 11 }
@@ -228,7 +382,7 @@ Rectangle {
                                 from: -120; to: 0; stepSize: 1
                                 value: root.v.zoneYawMin
                                 valueText: Math.round(-root.v.zoneYawMin) + "°"
-                                onMoved: (x) => cam.set("zoneYawMin", Math.round(x))
+                                onMoved: (x) => Cam.set("zoneYawMin", Math.round(x))
                             }
                             SliderRow {
                                 Layout.fillWidth: true
@@ -236,7 +390,7 @@ Rectangle {
                                 from: 0; to: 120; stepSize: 1
                                 value: root.v.zoneYawMax
                                 valueText: Math.round(root.v.zoneYawMax) + "°"
-                                onMoved: (x) => cam.set("zoneYawMax", Math.round(x))
+                                onMoved: (x) => Cam.set("zoneYawMax", Math.round(x))
                             }
                             SliderRow {
                                 Layout.fillWidth: true
@@ -244,7 +398,7 @@ Rectangle {
                                 from: 0; to: 90; stepSize: 1
                                 value: -root.v.zonePitchMin
                                 valueText: Math.round(-root.v.zonePitchMin) + "° " + qsTr("up")
-                                onMoved: (x) => cam.set("zonePitchMin", -Math.round(x))
+                                onMoved: (x) => Cam.set("zonePitchMin", -Math.round(x))
                             }
                             SliderRow {
                                 Layout.fillWidth: true
@@ -252,70 +406,154 @@ Rectangle {
                                 from: 0; to: 90; stepSize: 1
                                 value: root.v.zonePitchMax
                                 valueText: Math.round(root.v.zonePitchMax) + "° " + qsTr("down")
-                                onMoved: (x) => cam.set("zonePitchMax", Math.round(x))
+                                onMoved: (x) => Cam.set("zonePitchMax", Math.round(x))
                             }
                         }
                         SettingRow {
                             label: qsTr("Pick who to track automatically")
                             description: qsTr("When off, you choose the person with a gesture.")
-                            Toggle { checked: root.v.zoneAutoSelect; enabled: root.connected; onToggled: cam.set("zoneAutoSelect", checked) }
+                            Toggle { checked: root.v.zoneAutoSelect; enabled: root.connected; onToggled: Cam.set("zoneAutoSelect", checked) }
                         }
                         SettingRow {
                             label: qsTr("Starting position in the area")
                             divider: false
-                            Btn { text: qsTr("Use current view"); compact: true; enabled: root.connected; onClicked: cam.zoneStart("use-current") }
-                            Btn { text: qsTr("Go there"); compact: true; enabled: root.connected; onClicked: cam.zoneStart("go") }
-                            Btn { text: qsTr("Reset area"); variant: "ghost"; compact: true; enabled: root.connected; onClicked: { cam.resetZone(); cam.zoneStart("reset") } }
+                            Btn { text: qsTr("Use current view"); compact: true; enabled: root.connected; onClicked: Cam.zoneStart("use-current") }
+                            Btn { text: qsTr("Go there"); compact: true; enabled: root.connected; onClicked: Cam.zoneStart("go") }
+                            Btn { text: qsTr("Reset area"); variant: "ghost"; compact: true; enabled: root.connected; onClicked: { Cam.resetZone(); Cam.zoneStart("reset") } }
                         }
                     }
 
-                    // ------------------------------------------------ startup and power
+                    // ------------------------------------------------ image
                     Section {
-                        sectionId: "startup"
-                        title: qsTr("Startup and power")
-                        subtitle: qsTr("What the camera does when it turns on, and when it goes to sleep.")
+                        sectionId: "image"
+                        title: qsTr("Image")
+                        headerExtras: Btn { text: qsTr("Reset all"); variant: "ghost"; compact: true; enabled: root.connected; onClicked: Cam.resetImage() }
+
+                        Label2 { text: qsTr("Field of view") }
+                        Segmented {
+                            Layout.fillWidth: true
+                            stretch: true
+                            options: [qsTr("Wide 86°"), qsTr("Medium 78°"), qsTr("Narrow 65°")]
+                            currentIndex: root.v.fov
+                            enabled: root.connected
+                            onActivated: (i) => Cam.set("fov", i)
+                        }
+
                         SettingRow {
-                            label: qsTr("Start position and zoom")
-                            description: qsTr("Saved on the camera")
-                            Btn { text: qsTr("Use current view"); compact: true; enabled: root.connected; onClicked: cam.startup("use-current") }
-                            Btn { text: qsTr("Go there"); compact: true; enabled: root.connected; onClicked: cam.startup("go") }
-                            Btn { text: qsTr("Reset"); variant: "ghost"; compact: true; enabled: root.connected; onClicked: cam.startup("reset") }
+                            label: qsTr("Automatic exposure")
+                            Toggle { checked: root.v.exposureAuto; enabled: root.connected; onToggled: Cam.set("exposureAuto", checked) }
                         }
                         SettingRow {
-                            label: qsTr("Tracking mode at startup")
+                            label: qsTr("Shutter speed")
+                            dim: root.v.exposureAuto
                             Select {
-                                model: [qsTr("Off"), qsTr("Person · upper body"), qsTr("Person · full body"), qsTr("Person · close-up"),
-                                        qsTr("Group"), qsTr("Hand"), qsTr("Desk"), qsTr("Whiteboard")]
-                                currentIndex: root.v.bootMode
+                                implicitWidth: 160
+                                model: Cam.shutterLabels
+                                currentIndex: root.v.shutter - 9
                                 enabled: root.connected
-                                onActivated: (i) => cam.set("bootMode", i)
+                                onActivated: (i) => Cam.set("shutter", i + 9)
                             }
                         }
                         SettingRow {
-                            label: qsTr("Go to sleep when idle")
-                            Select {
-                                readonly property var seconds: [0, 300, 600, 1800, 3600]
-                                model: [qsTr("Never"), qsTr("After 5 minutes"), qsTr("After 10 minutes"), qsTr("After 30 minutes"), qsTr("After 1 hour")]
-                                currentIndex: Math.max(0, seconds.indexOf(root.v.sleepTimer))
-                                onActivated: (i) => cam.set("sleepTimer", seconds[i])
-                            }
+                            label: qsTr("Expose for faces")
+                            Toggle { checked: root.v.faceExposure; enabled: root.connected; onToggled: Cam.set("faceExposure", checked) }
                         }
                         SettingRow {
-                            label: qsTr("Keep the microphone on while asleep")
+                            label: qsTr("Autofocus")
+                            Toggle { checked: root.v.autoFocus; enabled: root.connected; onToggled: Cam.set("autoFocus", checked) }
+                        }
+                        SliderRow {
+                            Layout.fillWidth: true
+                            label: qsTr("Manual focus")
+                            valueText: qsTr("Near ↔ far")
+                            from: 0; to: 100; stepSize: 1
+                            value: root.v.manualFocus
+                            dim: root.v.autoFocus
+                            enabled: root.connected
+                            onMoved: (x) => Cam.set("manualFocus", Math.round(x))
+                        }
+                        SettingRow {
+                            label: qsTr("Focus on faces")
+                            Toggle { checked: root.v.faceFocus; enabled: root.connected; onToggled: Cam.set("faceFocus", checked) }
+                        }
+
+                        Label2 { text: qsTr("White balance") }
+                        Segmented {
+                            Layout.fillWidth: true
+                            stretch: true
+                            options: [qsTr("Auto"), qsTr("Daylight"), qsTr("Cloudy"), qsTr("Indoor"), qsTr("Fluorescent"), qsTr("Manual")]
+                            currentIndex: root.v.wbMode
+                            enabled: root.connected
+                            onActivated: (i) => Cam.set("wbMode", i)
+                        }
+                        SliderRow {
+                            Layout.fillWidth: true
+                            visible: root.v.wbMode === 5
+                            label: qsTr("Temperature")
+                            from: Cam.ranges.wb.min; to: Cam.ranges.wb.max; stepSize: 100
+                            value: root.v.wbKelvin
+                            valueText: root.v.wbKelvin + " K"
+                            onMoved: (x) => Cam.set("wbKelvin", Math.round(x / 100) * 100)
+                        }
+
+                        GridLayout {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 4
+                            columns: width > 560 ? 2 : 1
+                            columnSpacing: 24
+                            rowSpacing: 16
+                            enabled: root.connected
+                            Repeater {
+                                model: [{ key: "brightness", label: qsTr("Brightness") }, { key: "contrast", label: qsTr("Contrast") },
+                                        { key: "saturation", label: qsTr("Saturation") }, { key: "sharpness", label: qsTr("Sharpness") },
+                                        { key: "hue", label: qsTr("Hue") }]
+                                SliderRow {
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    label: modelData.label
+                                    from: Cam.ranges[modelData.key].min
+                                    to: Cam.ranges[modelData.key].max
+                                    stepSize: 1
+                                    value: root.v[modelData.key]
+                                    onMoved: (x) => Cam.set(modelData.key, Math.round(x))
+                                }
+                            }
+                        }
+
+                        Label2 { text: qsTr("Anti-flicker"); Layout.topMargin: 6 }
+                        Segmented {
+                            Layout.fillWidth: true
+                            stretch: true
+                            options: [qsTr("Off"), qsTr("50 Hz"), qsTr("60 Hz"), qsTr("Auto")]
+                            currentIndex: root.v.antiFlicker
+                            enabled: root.connected
+                            onActivated: (i) => Cam.set("antiFlicker", i)
+                        }
+                        SettingRow {
+                            label: qsTr("HDR")
+                            Toggle { checked: root.v.hdr; enabled: root.connected; onToggled: Cam.set("hdr", checked) }
+                        }
+                        SettingRow {
+                            label: qsTr("Mirror image")
                             divider: false
-                            Toggle { checked: root.v.micDuringSleep; enabled: root.connected; onToggled: cam.set("micDuringSleep", checked) }
+                            Toggle { checked: root.v.mirrored; enabled: root.connected; onToggled: Cam.set("mirrored", checked) }
                         }
                     }
 
-                    // ------------------------------------------------ audio and voice
+                    // ------------------------------------------------ microphone and voice
                     Section {
                         sectionId: "voice"
-                        title: qsTr("Audio and voice")
-                        subtitle: qsTr("Say a command to the camera instead of reaching for the app.")
+                        title: qsTr("Microphone and voice")
+                        subtitle: qsTr("How the camera’s microphone sounds, and the commands you can say to it.")
                         SettingRow {
                             label: qsTr("Automatic mic volume")
                             description: qsTr("Evens out loud and quiet speech")
-                            Toggle { checked: root.v.audioAutoGain; enabled: root.connected; onToggled: cam.set("audioAutoGain", checked) }
+                            Toggle { checked: root.v.audioAutoGain; enabled: root.connected; onToggled: Cam.set("audioAutoGain", checked) }
+                        }
+                        SettingRow {
+                            label: qsTr("Keep the microphone on while asleep")
+                            description: qsTr("Other apps can still hear you while the camera sleeps")
+                            Toggle { checked: root.v.micDuringSleep; enabled: root.connected; onToggled: Cam.set("micDuringSleep", checked) }
                         }
                         SettingRow {
                             id: voiceMaster
@@ -323,7 +561,7 @@ Rectangle {
                             Toggle {
                                 checked: root.anyVoice
                                 enabled: root.connected
-                                onToggled: { for (let i = 0; i < 7; ++i) cam.set("voice" + i, checked) }
+                                onToggled: { for (let i = 0; i < 7; ++i) Cam.set("voice" + i, checked) }
                             }
                         }
                         SettingRow {
@@ -334,7 +572,7 @@ Rectangle {
                                 options: [qsTr("English"), qsTr("Chinese")]
                                 currentIndex: root.v.voiceLanguage === 0 ? 1 : 0
                                 enabled: root.connected
-                                onActivated: (i) => cam.set("voiceLanguage", i === 0 ? 1 : 0)
+                                onActivated: (i) => Cam.set("voiceLanguage", i === 0 ? 1 : 0)
                             }
                         }
                         GridLayout {
@@ -368,202 +606,11 @@ Rectangle {
                                             checked: root.v["voice" + voiceRow.index]
                                             enabled: root.connected
                                             Accessible.name: voiceRow.modelData
-                                            onToggled: cam.set("voice" + voiceRow.index, checked)
+                                            onToggled: Cam.set("voice" + voiceRow.index, checked)
                                         }
                                     }
                                 }
                             }
-                        }
-                    }
-
-                    // ------------------------------------------------ image
-                    Section {
-                        sectionId: "image"
-                        title: qsTr("Image")
-                        headerExtras: Btn { text: qsTr("Reset all"); variant: "ghost"; compact: true; enabled: root.connected; onClicked: cam.resetImage() }
-
-                        Label2 { text: qsTr("Field of view") }
-                        Segmented {
-                            Layout.fillWidth: true
-                            stretch: true
-                            options: [qsTr("Wide 86°"), qsTr("Medium 78°"), qsTr("Narrow 65°")]
-                            currentIndex: root.v.fov
-                            enabled: root.connected
-                            onActivated: (i) => cam.set("fov", i)
-                        }
-
-                        SettingRow {
-                            label: qsTr("Automatic exposure")
-                            Toggle { checked: root.v.exposureAuto; enabled: root.connected; onToggled: cam.set("exposureAuto", checked) }
-                        }
-                        SettingRow {
-                            label: qsTr("Shutter speed")
-                            dim: root.v.exposureAuto
-                            Select {
-                                implicitWidth: 160
-                                model: cam.shutterLabels
-                                currentIndex: root.v.shutter - 9
-                                enabled: root.connected
-                                onActivated: (i) => cam.set("shutter", i + 9)
-                            }
-                        }
-                        SettingRow {
-                            label: qsTr("Expose for faces")
-                            Toggle { checked: root.v.faceExposure; enabled: root.connected; onToggled: cam.set("faceExposure", checked) }
-                        }
-                        SettingRow {
-                            label: qsTr("Autofocus")
-                            Toggle { checked: root.v.autoFocus; enabled: root.connected; onToggled: cam.set("autoFocus", checked) }
-                        }
-                        SliderRow {
-                            Layout.fillWidth: true
-                            label: qsTr("Manual focus")
-                            valueText: qsTr("Near ↔ far")
-                            from: 0; to: 100; stepSize: 1
-                            value: root.v.manualFocus
-                            dim: root.v.autoFocus
-                            enabled: root.connected
-                            onMoved: (x) => cam.set("manualFocus", Math.round(x))
-                        }
-                        SettingRow {
-                            label: qsTr("Focus on faces")
-                            Toggle { checked: root.v.faceFocus; enabled: root.connected; onToggled: cam.set("faceFocus", checked) }
-                        }
-
-                        Label2 { text: qsTr("White balance") }
-                        Segmented {
-                            Layout.fillWidth: true
-                            stretch: true
-                            options: [qsTr("Auto"), qsTr("Daylight"), qsTr("Cloudy"), qsTr("Indoor"), qsTr("Fluorescent"), qsTr("Manual")]
-                            currentIndex: root.v.wbMode
-                            enabled: root.connected
-                            onActivated: (i) => cam.set("wbMode", i)
-                        }
-                        SliderRow {
-                            Layout.fillWidth: true
-                            visible: root.v.wbMode === 5
-                            label: qsTr("Temperature")
-                            from: cam.ranges.wb.min; to: cam.ranges.wb.max; stepSize: 100
-                            value: root.v.wbKelvin
-                            valueText: root.v.wbKelvin + " K"
-                            onMoved: (x) => cam.set("wbKelvin", Math.round(x / 100) * 100)
-                        }
-
-                        GridLayout {
-                            Layout.fillWidth: true
-                            Layout.topMargin: 4
-                            columns: width > 560 ? 2 : 1
-                            columnSpacing: 24
-                            rowSpacing: 16
-                            enabled: root.connected
-                            Repeater {
-                                model: [{ key: "brightness", label: qsTr("Brightness") }, { key: "contrast", label: qsTr("Contrast") },
-                                        { key: "saturation", label: qsTr("Saturation") }, { key: "sharpness", label: qsTr("Sharpness") },
-                                        { key: "hue", label: qsTr("Hue") }]
-                                SliderRow {
-                                    required property var modelData
-                                    Layout.fillWidth: true
-                                    label: modelData.label
-                                    from: cam.ranges[modelData.key].min
-                                    to: cam.ranges[modelData.key].max
-                                    stepSize: 1
-                                    value: root.v[modelData.key]
-                                    onMoved: (x) => cam.set(modelData.key, Math.round(x))
-                                }
-                            }
-                        }
-
-                        Label2 { text: qsTr("Anti-flicker"); Layout.topMargin: 6 }
-                        Segmented {
-                            Layout.fillWidth: true
-                            stretch: true
-                            options: [qsTr("Off"), qsTr("50 Hz"), qsTr("60 Hz"), qsTr("Auto")]
-                            currentIndex: root.v.antiFlicker
-                            enabled: root.connected
-                            onActivated: (i) => cam.set("antiFlicker", i)
-                        }
-                        SettingRow {
-                            label: qsTr("HDR")
-                            Toggle { checked: root.v.hdr; enabled: root.connected; onToggled: cam.set("hdr", checked) }
-                        }
-                        SettingRow {
-                            label: qsTr("Mirror image")
-                            divider: false
-                            Toggle { checked: root.v.mirrored; enabled: root.connected; onToggled: cam.set("mirrored", checked) }
-                        }
-                    }
-
-                    // ------------------------------------------------ movement
-                    Section {
-                        sectionId: "motion"
-                        title: qsTr("Movement and zoom")
-                        SliderRow {
-                            Layout.fillWidth: true
-                            label: qsTr("Zoom speed")
-                            from: 0; to: 10; stepSize: 1
-                            value: root.v.zoomSpeed
-                            valueText: root.v.zoomSpeed === 0 ? qsTr("Camera default") : root.v.zoomSpeed + " / 10"
-                            onMoved: (x) => cam.set("zoomSpeed", Math.round(x))
-                        }
-                        SliderRow {
-                            Layout.fillWidth: true
-                            label: qsTr("Manual pan and tilt speed")
-                            from: 10; to: 120; stepSize: 5
-                            value: root.v.gimbalSpeed
-                            valueText: root.v.gimbalSpeed + "°/s"
-                            onMoved: (x) => cam.set("gimbalSpeed", Math.round(x))
-                        }
-                        SettingRow {
-                            label: qsTr("Zoom in automatically while tracking")
-                            Toggle { checked: root.v.autoZoom; onToggled: cam.set("autoZoom", checked) }
-                        }
-                        SettingRow {
-                            label: qsTr("Movement")
-                            description: qsTr("How smoothly the camera glides for click-to-aim, the dial, presets and the arrow keys")
-                            Segmented {
-                                implicitWidth: 340
-                                stretch: true
-                                options: [qsTr("Fast"), qsTr("Normal"), qsTr("Smooth"), qsTr("Cinematic")]
-                                currentIndex: root.v.smoothness
-                                onActivated: (i) => cam.set("smoothness", i)
-                            }
-                        }
-                        SettingRow {
-                            label: qsTr("Resume tracking by itself")
-                            description: qsTr("After you move the camera by hand, turn tracking back on once you stop")
-                            Toggle { checked: root.v.autoResume; onToggled: cam.set("autoResume", checked) }
-                        }
-                        SliderRow {
-                            Layout.fillWidth: true
-                            visible: root.v.autoResume
-                            label: qsTr("Resume after")
-                            from: 2; to: 30; stepSize: 1
-                            value: root.v.autoResumeSeconds
-                            valueText: qsTr("%1 s").arg(root.v.autoResumeSeconds)
-                            onMoved: (x) => cam.set("autoResumeSeconds", Math.round(x))
-                        }
-                        SettingRow {
-                            label: qsTr("Camera mounted upside down")
-                            description: qsTr("Tells the camera to reverse its turning direction")
-                            Toggle { checked: root.v.yawReverse; onToggled: cam.set("yawReverse", checked) }
-                        }
-
-                        Label2 { text: qsTr("Advanced"); Layout.topMargin: 8 }
-                        SettingRow {
-                            label: qsTr("Check movement directions")
-                            description: qsTr("Up should move the camera up and Right should move it right. If they don't, this fixes it in two steps.")
-                            Btn { text: qsTr("Check…"); iconName: "move"; compact: true; enabled: root.connected; onClicked: root.openDirectionCheck() }
-                        }
-                        SettingRow {
-                            label: qsTr("Flip left and right")
-                            description: qsTr("For every control: arrow keys, the dial, click-to-aim and dragging. Normally off.")
-                            Toggle { checked: root.v.invertPan; onToggled: cam.set("invertPan", checked) }
-                        }
-                        SettingRow {
-                            label: qsTr("Flip up and down")
-                            description: qsTr("For every control. Normally off.")
-                            divider: false
-                            Toggle { checked: root.v.invertTilt; onToggled: cam.set("invertTilt", checked) }
                         }
                     }
 
@@ -574,60 +621,100 @@ Rectangle {
                         SettingRow {
                             label: qsTr("Select or release the target")
                             description: qsTr("Raise an open palm")
-                            Toggle { checked: root.v.gestureSelect; onToggled: cam.set("gestureSelect", checked) }
+                            Toggle { checked: root.v.gestureSelect; onToggled: Cam.set("gestureSelect", checked) }
                         }
                         SettingRow {
                             label: qsTr("Zoom in and out")
                             description: qsTr("Make an L shape with your thumb and finger")
-                            Toggle { checked: root.v.gestureZoom; onToggled: cam.set("gestureZoom", checked) }
+                            Toggle { checked: root.v.gestureZoom; onToggled: Cam.set("gestureZoom", checked) }
                         }
                         SettingRow {
                             label: qsTr("Dynamic zoom")
-                            Toggle { checked: root.v.gestureDynamic; onToggled: cam.set("gestureDynamic", checked) }
+                            Toggle { checked: root.v.gestureDynamic; onToggled: Cam.set("gestureDynamic", checked) }
                         }
                         SettingRow {
                             label: qsTr("Reverse dynamic zoom direction")
                             divider: false
                             dim: !root.v.gestureDynamic
-                            Toggle { checked: root.v.gestureReverse; enabled: root.v.gestureDynamic; onToggled: cam.set("gestureReverse", checked) }
+                            Toggle { checked: root.v.gestureReverse; enabled: root.v.gestureDynamic; onToggled: Cam.set("gestureReverse", checked) }
+                        }
+                    }
+
+                    // ------------------------------------------------ startup and sleep
+                    Section {
+                        sectionId: "startup"
+                        title: qsTr("Startup and sleep")
+                        subtitle: qsTr("What the camera does when it turns on, and when it goes to sleep.")
+                        SettingRow {
+                            label: qsTr("Start position and zoom")
+                            description: qsTr("Saved on the camera")
+                            Btn { text: qsTr("Use current view"); compact: true; enabled: root.connected; onClicked: Cam.startup("use-current") }
+                            Btn { text: qsTr("Go there"); compact: true; enabled: root.connected; onClicked: Cam.startup("go") }
+                            Btn { text: qsTr("Reset"); variant: "ghost"; compact: true; enabled: root.connected; onClicked: Cam.startup("reset") }
+                        }
+                        SettingRow {
+                            label: qsTr("Tracking mode at startup")
+                            Select {
+                                model: [qsTr("Off"), qsTr("Person · upper body"), qsTr("Person · full body"), qsTr("Person · close-up"),
+                                        qsTr("Group"), qsTr("Hand"), qsTr("Desk"), qsTr("Whiteboard")]
+                                currentIndex: root.v.bootMode
+                                enabled: root.connected
+                                onActivated: (i) => Cam.set("bootMode", i)
+                            }
+                        }
+                        SettingRow {
+                            label: qsTr("Go to sleep when idle")
+                            Select {
+                                readonly property var seconds: [0, 300, 600, 1800, 3600]
+                                model: [qsTr("Never"), qsTr("After 5 minutes"), qsTr("After 10 minutes"), qsTr("After 30 minutes"), qsTr("After 1 hour")]
+                                currentIndex: Math.max(0, seconds.indexOf(root.v.sleepTimer))
+                                onActivated: (i) => Cam.set("sleepTimer", seconds[i])
+                            }
+                        }
+                        SettingRow {
+                            label: qsTr("Picture on the camera while asleep")
+                            description: qsTr("One of the three pictures saved on the camera")
+                            divider: false
+                            SleepPicturePicker { enabled: root.connected && root.v.hasSleepPicture; showLabel: false }
                         }
                     }
 
                     // ------------------------------------------------ profiles
                     Section {
                         sectionId: "profiles"
+                        navGroup: "app"
                         title: qsTr("Profiles")
                         subtitle: qsTr("Save your whole setup, like “Meetings” or “Streaming”, and switch in one click.")
                         headerExtras: Btn { text: qsTr("Save current…"); iconName: "plus"; compact: true; onClicked: root.saveProfileRequested() }
 
                         Text {
-                            visible: cam.profiles.length === 0
+                            visible: Cam.profiles.length === 0
                             text: qsTr("No profiles yet.")
                             color: Theme.textMuted
                             font.family: Theme.font
                             font.pixelSize: Theme.fontSize - 1
                         }
                         Repeater {
-                            model: cam.profiles
+                            model: Cam.profiles
                             SettingRow {
                                 id: profileRow
                                 required property string modelData
                                 label: modelData
-                                Btn { text: qsTr("Apply"); variant: "outline"; compact: true; enabled: root.connected; onClicked: cam.applyProfile(profileRow.modelData) }
-                                IconBtn { iconName: "trash"; tip: qsTr("Delete profile"); implicitWidth: 32; implicitHeight: 32; iconSize: 15; onClicked: cam.deleteProfile(profileRow.modelData) }
+                                Btn { text: qsTr("Apply"); variant: "outline"; compact: true; enabled: root.connected; onClicked: Cam.applyProfile(profileRow.modelData) }
+                                IconBtn { iconName: "trash"; tip: qsTr("Delete profile"); implicitWidth: 32; implicitHeight: 32; iconSize: 15; onClicked: Cam.deleteProfile(profileRow.modelData) }
                             }
                         }
                         RowLayout {
                             spacing: 8
                             Btn { text: qsTr("Import…"); iconName: "upload"; variant: "ghost"; compact: true; onClicked: importDialog.open() }
-                            Btn { text: qsTr("Export…"); iconName: "download"; variant: "ghost"; compact: true; enabled: cam.profiles.length > 0; onClicked: exportDialog.open() }
+                            Btn { text: qsTr("Export…"); iconName: "download"; variant: "ghost"; compact: true; enabled: Cam.profiles.length > 0; onClicked: exportDialog.open() }
                         }
                     }
 
                     // ------------------------------------------------ app
                     Section {
                         sectionId: "app"
-                        title: qsTr("App")
+                        title: qsTr("App and updates")
                         Label2 { text: qsTr("Appearance") }
                         SettingRow {
                             label: qsTr("Theme")
@@ -636,7 +723,7 @@ Rectangle {
                                 stretch: true
                                 options: [qsTr("System"), qsTr("Dark"), qsTr("Light")]
                                 currentIndex: root.v.theme
-                                onActivated: (i) => cam.set("theme", i)
+                                onActivated: (i) => Cam.set("theme", i)
                             }
                         }
                         SettingRow {
@@ -647,121 +734,121 @@ Rectangle {
                                 stretch: true
                                 options: [qsTr("Gimbot"), qsTr("System")]
                                 currentIndex: root.v.systemAccent ? 1 : 0
-                                onActivated: (i) => cam.set("systemAccent", i === 1)
+                                onActivated: (i) => Cam.set("systemAccent", i === 1)
                             }
                         }
                         SettingRow {
                             label: qsTr("Plain background")
                             description: qsTr("Hides the faint dot pattern behind the preview when there's no picture. It's also hidden when animations are turned off in System Settings.")
-                            Toggle { checked: root.v.plainBackground; onToggled: cam.set("plainBackground", checked) }
+                            Toggle { checked: root.v.plainBackground; onToggled: Cam.set("plainBackground", checked) }
                         }
                         SettingRow {
                             label: qsTr("Show framing grid on the preview")
-                            Toggle { checked: root.v.showGrid; onToggled: cam.set("showGrid", checked) }
+                            Toggle { checked: root.v.showGrid; onToggled: Cam.set("showGrid", checked) }
                         }
                         SettingRow {
                             label: qsTr("Show live preview")
                             description: qsTr("Turn off to leave the camera's video free for other apps")
-                            Toggle { checked: root.v.previewEnabled; onToggled: cam.set("previewEnabled", checked) }
+                            Toggle { checked: root.v.previewEnabled; onToggled: Cam.set("previewEnabled", checked) }
                         }
 
                         Label2 { text: qsTr("Behavior"); Layout.topMargin: 8 }
                         SettingRow {
                             label: qsTr("Keep running in the tray when closed")
-                            description: platform.trayAvailable ? "" : qsTr("No system tray was found")
-                            Toggle { checked: root.v.closeToTray; enabled: platform.trayAvailable; onToggled: cam.set("closeToTray", checked) }
+                            description: Platform.trayAvailable ? "" : qsTr("No system tray was found")
+                            Toggle { checked: root.v.closeToTray; enabled: Platform.trayAvailable; onToggled: Cam.set("closeToTray", checked) }
                         }
                         SettingRow {
                             label: qsTr("Start Gimbot when you log in")
                             description: qsTr("Starts hidden in the tray")
-                            Toggle { checked: root.v.autostart; onToggled: cam.set("autostart", checked) }
+                            Toggle { checked: root.v.autostart; onToggled: Cam.set("autostart", checked) }
                         }
                         SettingRow {
-                            visible: platform.kdeIntegration
+                            visible: Platform.kdeIntegration
                             label: qsTr("Keyboard shortcuts")
                             description: qsTr("Assign keys that work in any app in System Settings › Shortcuts › Gimbot")
-                            Btn { text: qsTr("Open"); iconName: "external"; compact: true; onClicked: platform.openUrl("systemsettings://kcm_keys") }
+                            Btn { text: qsTr("Open"); iconName: "external"; compact: true; onClicked: Platform.openUrl("systemsettings://kcm_keys") }
                         }
 
                         Label2 { text: qsTr("Updates"); Layout.topMargin: 8 }
                         SettingRow {
                             label: qsTr("Tell me about new versions")
-                            description: !updater.configured ? qsTr("Not available in this build")
+                            description: !Updater.configured ? qsTr("Not available in this build")
                                         : root.v.updateChannel === 2 ? qsTr("Includes beta versions, which may have bugs. Switching back offers the newest normal version.")
-                                        : updater.installType === "aur" ? qsTr("Installed from the AUR, so it updates with your AUR helper")
-                                        : updater.canInstall ? qsTr("Gimbot installs signed updates for you with one click")
+                                        : Updater.installType === "aur" ? qsTr("Installed from the AUR, so it updates with your AUR helper")
+                                        : Updater.canInstall ? qsTr("Gimbot installs signed updates for you with one click")
                                         : qsTr("Update with your package manager")
                             Segmented {
                                 implicitWidth: 260
                                 stretch: true
-                                enabled: updater.configured
+                                enabled: Updater.configured
                                 options: [qsTr("Off"), qsTr("Normal"), qsTr("Beta")]
                                 currentIndex: root.v.updateChannel
-                                onActivated: (i) => cam.set("updateChannel", i)
+                                onActivated: (i) => Cam.set("updateChannel", i)
                             }
                         }
                         SettingRow {
-                            visible: updater.configured && root.v.updateChannel > 0
-                            label: updater.state === "checking" ? qsTr("Checking…")
-                                 : updater.state === "available" ? qsTr("Version %1 is available").arg(updater.latestVersion)
-                                 : updater.state === "upToDate" ? qsTr("You're up to date (%1)").arg(platform.version)
-                                 : updater.state === "error" ? qsTr("Couldn't check for updates")
-                                 : qsTr("Current version: %1").arg(platform.version)
+                            visible: Updater.configured && root.v.updateChannel > 0
+                            label: Updater.state === "checking" ? qsTr("Checking…")
+                                 : Updater.state === "available" ? qsTr("Version %1 is available").arg(Updater.latestVersion)
+                                 : Updater.state === "upToDate" ? qsTr("You're up to date (%1)").arg(Platform.version)
+                                 : Updater.state === "error" ? qsTr("Couldn't check for updates")
+                                 : qsTr("Current version: %1").arg(Platform.version)
                             description: {
                                 let d = []
-                                if (updater.state === "error") d.push(updater.checkError)
-                                else if (updater.usedDnsFallback)
+                                if (Updater.state === "error") d.push(Updater.checkError)
+                                else if (Updater.usedDnsFallback)
                                     d.push(qsTr("This computer's DNS isn't working, so Gimbot checked through a public DNS service. Other apps may not connect."))
-                                if (updater.lastChecked.length > 0) d.push(qsTr("Last checked %1").arg(updater.lastChecked))
+                                if (Updater.lastChecked.length > 0) d.push(qsTr("Last checked %1").arg(Updater.lastChecked))
                                 return d.join("\n")
                             }
                             Btn {
-                                visible: (updater.state === "error" && updater.checkError.indexOf("DNS") >= 0) || updater.usedDnsFallback
+                                visible: (Updater.state === "error" && Updater.checkError.indexOf("DNS") >= 0) || Updater.usedDnsFallback
                                 text: qsTr("How to fix")
                                 iconName: "external"
                                 variant: "ghost"
                                 compact: true
-                                onClicked: platform.openUrl(platform.repoUrl + "#cant-reach-github")
+                                onClicked: Platform.openUrl(Platform.repoUrl + "#cant-reach-github")
                             }
                             Btn {
-                                visible: updater.state === "available"
-                                text: updater.canInstall ? (updater.isSwitch ? qsTr("Switch now") : qsTr("Update now")) : qsTr("What's new")
-                                iconName: updater.canInstall ? "download" : "external"
-                                variant: updater.canInstall ? "primary" : "outline"
+                                visible: Updater.state === "available"
+                                text: Updater.canInstall ? (Updater.isSwitch ? qsTr("Switch now") : qsTr("Update now")) : qsTr("What's new")
+                                iconName: Updater.canInstall ? "download" : "external"
+                                variant: Updater.canInstall ? "primary" : "outline"
                                 compact: true
-                                onClicked: updater.canInstall ? root.openUpdate() : platform.openUrl(updater.latestUrl)
+                                onClicked: Updater.canInstall ? root.openUpdate() : Platform.openUrl(Updater.latestUrl)
                             }
                             Btn {
-                                text: updater.state === "checking" ? qsTr("Checking…")
-                                    : updater.state === "error" ? (updater.retryIn > 0 ? qsTr("Try again in %1 s").arg(updater.retryIn) : qsTr("Try again"))
+                                text: Updater.state === "checking" ? qsTr("Checking…")
+                                    : Updater.state === "error" ? (Updater.retryIn > 0 ? qsTr("Try again in %1 s").arg(Updater.retryIn) : qsTr("Try again"))
                                     : qsTr("Check now")
                                 iconName: "refresh"
                                 compact: true
-                                enabled: updater.state !== "checking" && !(updater.state === "error" && updater.retryIn > 0)
-                                tip: updater.retryIn > 0 ? qsTr("Waiting a moment before asking GitHub again") : ""
-                                onClicked: updater.check()
+                                enabled: Updater.state !== "checking" && !(Updater.state === "error" && Updater.retryIn > 0)
+                                tip: Updater.retryIn > 0 ? qsTr("Waiting a moment before asking GitHub again") : ""
+                                onClicked: Updater.check()
                             }
                         }
                         SettingRow { // AUR installs update through the AUR helper
-                            visible: updater.installType === "aur"
+                            visible: Updater.installType === "aur"
                             label: qsTr("Update from the AUR")
-                            description: qsTr("Run this in a terminal: %1").arg(updater.aurCommand)
+                            description: qsTr("Run this in a terminal: %1").arg(Updater.aurCommand)
                             Btn {
                                 text: qsTr("Copy command")
                                 iconName: "copy"
                                 compact: true
-                                onClicked: { platform.copyToClipboard(updater.aurCommand); root.toast(qsTr("Copied")) }
+                                onClicked: { Platform.copyToClipboard(Updater.aurCommand); root.toast(qsTr("Copied")) }
                             }
                         }
                         SettingRow {
-                            visible: updater.canInstall && updater.previousVersion.length > 0
-                            label: qsTr("Go back to Gimbot %1").arg(updater.previousVersion)
+                            visible: Updater.canInstall && Updater.previousVersion.length > 0
+                            label: qsTr("Go back to Gimbot %1").arg(Updater.previousVersion)
                             description: qsTr("Reinstall the version you had before the last update, if this one misbehaves. Your settings stay.")
                             Btn {
                                 text: qsTr("Go back…")
                                 iconName: "undo"
                                 compact: true
-                                enabled: updater.installState !== "running"
+                                enabled: Updater.installState !== "running"
                                 onClicked: root.confirmGoBack()
                             }
                         }
@@ -780,11 +867,11 @@ Rectangle {
                         SettingRow {
                             label: qsTr("Detailed logging")
                             description: qsTr("Records more detail to help track down hard bugs")
-                            Toggle { checked: root.v.verboseLogging; onToggled: cam.set("verboseLogging", checked) }
+                            Toggle { checked: root.v.verboseLogging; onToggled: Cam.set("verboseLogging", checked) }
                         }
                         SettingRow {
                             label: qsTr("Log files")
-                            Btn { text: qsTr("Open folder"); iconName: "folder"; variant: "ghost"; compact: true; onClicked: platform.openLogFolder() }
+                            Btn { text: qsTr("Open folder"); iconName: "folder"; variant: "ghost"; compact: true; onClicked: Platform.openLogFolder() }
                             Btn { text: qsTr("About Gimbot"); iconName: "info"; variant: "ghost"; compact: true; onClicked: root.openAbout() }
                         }
                         SettingRow {
@@ -792,72 +879,6 @@ Rectangle {
                             description: qsTr("Removes the app. You choose whether to keep your settings.")
                             divider: false
                             Btn { text: qsTr("Uninstall…"); variant: "danger"; compact: true; onClicked: root.openUninstall() }
-                        }
-                    }
-
-                    // ------------------------------------------------ device
-                    Section {
-                        sectionId: "device"
-                        title: qsTr("Device")
-                        GridLayout {
-                            Layout.fillWidth: true
-                            columns: 2
-                            columnSpacing: 16
-                            rowSpacing: 14
-                            Repeater {
-                                model: [{ k: qsTr("Model"), v: root.connected ? cam.model : "—" },
-                                        { k: qsTr("Serial number"), v: root.connected ? cam.serial : "—" },
-                                        { k: qsTr("Firmware"), v: root.connected ? cam.firmware : "—" },
-                                        { k: qsTr("Firmware updates"), v: qsTr("OBSBOT Center on Windows or macOS (the SDK can't update firmware)") },
-                                        { k: qsTr("Gimbot"), v: platform.version }]
-                                ColumnLayout {
-                                    required property var modelData
-                                    Layout.fillWidth: true
-                                    Layout.preferredWidth: 1
-                                    spacing: 2
-                                    Text { text: parent.modelData.k; color: Theme.textMuted; font.family: Theme.font; font.pixelSize: Theme.small }
-                                    Text {
-                                        text: parent.modelData.v
-                                        color: Theme.text
-                                        font.family: Theme.font
-                                        font.pixelSize: Theme.fontSize
-                                        wrapMode: Text.WordWrap
-                                        Layout.fillWidth: true
-                                    }
-                                }
-                            }
-                        }
-                        SettingRow {
-                            id: sdkRow
-                            readonly property string saved: platform.savedSdk
-                            readonly property string savedVersion: saved.replace(/^libdev_?v?/, "").replace(/\.zip$/, "")
-                            readonly property bool newer: saved.length > 0 && savedVersion !== platform.sdkVersion
-                            label: qsTr("OBSBOT SDK %1").arg(platform.sdkVersion)
-                            description: saved.length > 0
-                                ? (newer ? qsTr("Saved: %1 (newer than this build). Rebuild Gimbot to use it.").arg(saved)
-                                         : qsTr("Saved in Gimbot's folder: %1. You can delete it from Downloads.").arg(saved))
-                                : qsTr("No SDK saved in Gimbot's folder yet. Add it so updates work without your Downloads folder.")
-                            Btn { text: qsTr("Open folder"); iconName: "folder"; variant: "ghost"; compact: true; onClicked: platform.openSdkFolder() }
-                            Btn { text: qsTr("Add SDK…"); iconName: "plus"; compact: true; onClicked: sdkDialog.open() }
-                            Btn {
-                                visible: sdkRow.newer && updater.canInstall
-                                text: qsTr("Rebuild")
-                                iconName: "refresh"
-                                variant: "primary"
-                                compact: true
-                                onClicked: { updater.rebuild(); root.openUpdate() }
-                            }
-                        }
-                        SettingRow {
-                            label: qsTr("Guide light while adjusting the tracking area")
-                            description: qsTr("The camera's light shows a pattern while you change the area")
-                            Toggle { checked: root.v.guideLight; onToggled: cam.set("guideLight", checked) }
-                        }
-                        SettingRow {
-                            label: qsTr("Reset to factory settings")
-                            description: qsTr("Erases presets and every camera setting")
-                            divider: false
-                            Btn { text: qsTr("Reset camera…"); variant: "danger"; compact: true; enabled: root.connected; onClicked: root.confirmFactoryReset() }
                         }
                     }
 
@@ -882,7 +903,7 @@ Rectangle {
         nameFilters: [qsTr("OBSBOT SDK (libdev*.zip)")]
         currentFolder: StandardPaths.writableLocation(StandardPaths.DownloadLocation)
         onAccepted: {
-            if (platform.adoptSdk(selectedFile) && updater.canInstall) { updater.rebuild(); root.openUpdate() }
+            if (Platform.adoptSdk(selectedFile) && Updater.canInstall) { Updater.rebuild(); root.openUpdate() }
         }
     }
     FileDialog {
@@ -890,17 +911,18 @@ Rectangle {
         fileMode: FileDialog.SaveFile
         nameFilters: [qsTr("Gimbot profiles (*.json)")]
         defaultSuffix: "json"
-        onAccepted: cam.exportProfiles(selectedFile)
+        onAccepted: Cam.exportProfiles(selectedFile)
     }
     FileDialog {
         id: importDialog
         fileMode: FileDialog.OpenFile
         nameFilters: [qsTr("Gimbot profiles (*.json)")]
-        onAccepted: cam.importProfiles(selectedFile)
+        onAccepted: Cam.importProfiles(selectedFile)
     }
 
     component Section: Card {
         property string sectionId: ""
+        property string navGroup: sectionId // which side-menu item it belongs to
         Layout.fillWidth: true
         padding: 22
     }

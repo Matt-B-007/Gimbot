@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
+import Gimbot
 
 // Tracking on/off, framing, field of view, and (under More) style, auto zoom
 // and quick toggles for gestures, voice commands and the tracking area.
@@ -12,24 +14,25 @@ Card {
     signal openArea()
     signal openVoice()
 
-    readonly property var v: cam.values
+    readonly property var v: Cam.values
     readonly property bool on: v.mode !== 0
     // The mode the switch shows/uses: the current one, or the one it will turn on.
     readonly property int shownMode: on ? v.mode : v.lastTrackingMode
     readonly property var modeNames: ["", qsTr("Group"), qsTr("Person"), qsTr("Hand"), qsTr("Whiteboard"), qsTr("Desk")]
     readonly property bool anyVoice: v.voice0 || v.voice1 || v.voice2 || v.voice3 || v.voice4 || v.voice5 || v.voice6
-    readonly property bool usable: cam.connected && !v.asleep
+    readonly property bool usable: Cam.connected && !v.asleep
 
-    subtitle: !cam.connected ? "" : on ? qsTr("On · %1").arg(modeNames[v.mode] || "")
-                                       : cam.trackingPaused ? qsTr("Paused because you moved the camera")
+    subtitle: !Cam.connected ? "" : on ? qsTr("On · %1").arg(modeNames[v.mode] || "")
+                                       : Cam.trackingPaused ? qsTr("Paused because you moved the camera")
                                        : qsTr("Off · turns on as %1").arg(modeNames[shownMode] || qsTr("Person"))
     note: v.asleep ? qsTr("The camera is asleep. Wake it to use tracking.") : ""
     noteAction: v.asleep ? qsTr("Wake") : ""
-    onNoteActivated: cam.set("asleep", false)
+    onNoteActivated: Cam.set("asleep", false)
 
     headerExtras: [
         Btn {
-            visible: cam.trackingPaused
+            visible: Cam.trackingPaused
+            enabled: Cam.connected && !Cam.values.asleep
             text: qsTr("Resume")
             iconName: "play"
             variant: "outline"
@@ -37,7 +40,7 @@ Card {
             pill: true
             tip: qsTr("Turn tracking back on in %1 mode").arg(root.modeNames[root.shownMode] || "")
             shortcut: "Ctrl T"
-            onClicked: cam.resumeTracking()
+            onClicked: Cam.resumeTracking()
         },
         Toggle {
             id: master
@@ -45,7 +48,7 @@ Card {
             enabled: root.usable
             accessibleName: qsTr("Tracking")
             tip: root.on ? qsTr("Turn tracking off (Ctrl+T)") : qsTr("Turn tracking on in %1 mode (Ctrl+T)").arg(root.modeNames[root.shownMode] || "")
-            onToggled: cam.setTracking(checked)
+            onToggled: Cam.setTracking(checked)
         }
     ]
 
@@ -62,7 +65,7 @@ Card {
             currentIndex: root.shownMode === 2 ? root.v.framing : -1
             enabled: root.usable && root.shownMode === 2
             opacity: enabled ? 1 : 0.5
-            onActivated: (i) => cam.set("framing", i)
+            onActivated: (i) => Cam.set("framing", i)
         }
         Text {
             visible: root.usable && root.shownMode !== 2
@@ -86,7 +89,7 @@ Card {
             accessibleName: qsTr("Field of view")
             currentIndex: root.v.fov
             enabled: root.usable
-            onActivated: (i) => cam.set("fov", i)
+            onActivated: (i) => Cam.set("fov", i)
         }
         Text {
             text: qsTr("Changes what every app sees, not just this preview.")
@@ -111,27 +114,27 @@ Card {
                 accessibleName: qsTr("Tracking style")
                 currentIndex: root.v.trackStyle
                 enabled: root.usable
-                onActivated: (i) => cam.set("trackStyle", i)
+                onActivated: (i) => Cam.set("trackStyle", i)
             }
         },
         QuickToggle {
             label: qsTr("Zoom in automatically")
             description: qsTr("Keeps you a steady size in the picture while tracking")
             checked: root.v.autoZoom
-            onToggled: (on) => cam.set("autoZoom", on)
+            onToggled: (on) => Cam.set("autoZoom", on)
         },
         QuickToggle {
             label: qsTr("Resume tracking by itself")
             description: qsTr("After you move the camera by hand, tracking comes back %1 seconds after you stop").arg(root.v.autoResumeSeconds)
             checked: root.v.autoResume
             needsCamera: false
-            onToggled: (on) => cam.set("autoResume", on)
+            onToggled: (on) => Cam.set("autoResume", on)
         },
         QuickToggle {
             label: qsTr("Gestures")
             description: qsTr("Raise a palm to select yourself, make an L to zoom")
             checked: root.v.gestureSelect || root.v.gestureZoom
-            onToggled: (on) => { cam.set("gestureSelect", on); cam.set("gestureZoom", on) }
+            onToggled: (on) => { Cam.set("gestureSelect", on); Cam.set("gestureZoom", on) }
         },
         QuickToggle {
             label: qsTr("Voice commands")
@@ -139,7 +142,7 @@ Card {
             checked: root.anyVoice
             actionText: qsTr("Choose…")
             onAction: root.openVoice()
-            onToggled: (on) => { for (let i = 0; i < 7; ++i) cam.set("voice" + i, on) }
+            onToggled: (on) => { for (let i = 0; i < 7; ++i) Cam.set("voice" + i, on) }
         },
         QuickToggle {
             label: qsTr("Tracking area")
@@ -147,16 +150,16 @@ Card {
             checked: root.v.zoneEnabled
             actionText: qsTr("Edit…")
             onAction: root.openArea()
-            onToggled: (on) => cam.set("zoneEnabled", on)
+            onToggled: (on) => Cam.set("zoneEnabled", on)
         },
         Btn {
             text: qsTr("Reset tracking settings")
             iconName: "refresh"
             variant: "ghost"
             compact: true
-            enabled: cam.connected
+            enabled: Cam.connected
             tip: qsTr("Upper body, standard style, wide view, auto zoom on. You can undo this.")
-            onClicked: cam.resetTracking()
+            onClicked: Cam.resetTracking()
         }
     ]
 

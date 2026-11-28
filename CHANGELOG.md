@@ -3,6 +3,96 @@
 What changed in each version of Gimbot. The newest is at the top; the app
 shows a version's notes in its update window.
 
+## 0.1.0-beta.17 (2026-11-28)
+Fixes for the 30 problems found by going through every screen of beta.16.
+- **Up-and-down drags work again.** The page's scrolling was taking them
+  over, so the aim pad, drag-to-steer on the picture and the tracking area's
+  corners only moved sideways.
+- **Arrow keys keep working** after you click a button in the cards.
+- **The buttons on "Preview is off" and "Another app is using the picture"
+  work.** The picture's click area was lying on top of them.
+- **The picture stays put** while you scroll the cards: in a wide window the
+  picture's side and the cards' side now scroll separately.
+- **Tracking area:** the four corners are always on the picture. A corner
+  whose edge is outside the picture waits at the picture's edge, so any edge
+  can be pulled into view. Dragging a corner changes only its own two edges;
+  the others stay exactly as they were. Esc leaves drawing, and it ends by
+  itself if the camera sleeps or is unplugged. Corners and the bar's ends can
+  be reached with Tab and moved a degree at a time with the arrow keys.
+- **Reset area** in the drawing panel now does the same as in Settings: the
+  camera's whole range.
+- **"Camera starts at"** no longer shows "Straight ahead" at startup when
+  nothing was chosen.
+- **Menus are as wide as their longest line,** so nothing is cut off (preset
+  options, Profiles, quality, sleep timer).
+- **Asleep screen:** the sleep picture buttons no longer turn white under the
+  pointer in the light theme, they are hidden when the camera isn't set to
+  show a picture, and Mirror shows what the camera reports.
+- **Arrow keys are the same everywhere,** with the aim pad focused or not.
+  Settings no longer says Movement smoothness applies to the aim pad; the pad
+  follows your hand directly.
+- **Settings:** a Tracking card holds "Zoom in automatically while tracking"
+  and "Resume tracking by itself"; Profiles sits above App, not below
+  Uninstall.
+- **Presets:** the camera holds three, and the app now says so when they are
+  full. Shortcuts are listed as Ctrl 1-3. On small cards the name is no
+  longer cut short by the shortcut label.
+- Smaller things: the tour points to Help's new place and starts on the
+  right screen; the Connect screen lost its old second logo and gear; About
+  credits Space Grotesk; switched-off buttons and sliders look switched off;
+  Resume is off while the camera sleeps; the Status light card's dot is lit
+  only while the camera's light is; the picture's hint no longer covers the
+  top bar; "Preview is off" no longer claims the camera is tracking you;
+  "Draw the tracking area" is only offered when there is a picture to draw
+  on; the area box follows the video when it isn't 16:9; the zoom label and
+  aiming use the camera's real top zoom; the simulated camera stops at 120
+  degrees like the real one.
+
+## 0.1.0-beta.16 (2026-11-27)
+A new look for the whole app, built from the mockup. This release changes
+the inside of the code and what you see at the same time, which usually
+goes in two releases; it's one on purpose, because the new screens were
+written for the new code.
+- **A new side rail** for Studio and Settings, with Help (tour, shortcuts,
+  commands, direction check, what's new, report a problem, about) at the
+  bottom. The top bar has the camera, profiles, search, Sleep, and an
+  **Update ready** button when there's an update.
+- **Double-click the picture to aim** the camera there. A single click no
+  longer moves it, so you can click into the picture without it turning.
+- **Aim with a circle:** drag the dot. A little is slow, to the edge is fast,
+  and it springs back and stops when you let go. Arrow keys and Home still
+  work.
+- **Tracking shows in blue,** the same blue as the camera's light: a dot in
+  the picture's label and corner brackets around the picture. The label
+  also shows the field of view and zoom.
+- **Draw the tracking area on the picture:** drag its corners, or the ends of
+  the bar under it for an area wider than the picture. Open it from the
+  status bar, the Tracking card or the commands (Ctrl K).
+- **Status light card:** shows the camera light's level (Off, 1, 2 or 3). The
+  camera reports it but the SDK can't change it, so the card only shows it.
+- **Sleep picture:** choose which of the camera's three saved pictures it
+  shows while asleep, and mirror it, from the Asleep screen or from
+  Settings › Startup and sleep.
+- **Clearer camera states:** no camera, another app using the video, asleep,
+  and preview off each get their own screen with the next step.
+- **Settings in seven groups:** Camera, Tracking, Image, Microphone and
+  voice, Gestures, Startup and sleep, App and updates. Every setting is
+  still there. "Keep the microphone on while asleep" moved to Microphone
+  and voice.
+- **Narrow windows** show the Tracking, Aim and Image cards as tabs.
+- **Tray menu reordered:** Tracking, Camera asleep, presets, Start with my
+  computer, then Open Gimbot, Settings and Quit. It's the desktop's own
+  menu, so it keeps your desktop's style.
+- **Title font:** the Studio title uses Space Grotesk (SIL Open Font
+  License), bundled with the app.
+- Fixed: a rare crash when the window got narrow while the status bar or
+  the tracking area panel was updating. Lists that changed on every camera
+  update now keep their items and update them in place.
+- For developers: `cam`, `platform` and `updater` are now QML singletons
+  (`Cam`, `Platform`, `Updater`) instead of context properties, and qmllint's
+  unqualified-access and context-property checks are on again with no
+  warnings.
+
 ## 0.1.0-beta.15 (2026-11-27)
 Beta.14 again, with its new check fixed. Nothing for you to notice.
 - **The check for Qt Quick's lint rules gave a false alarm** on GitHub, so

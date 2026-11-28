@@ -66,7 +66,11 @@ struct Status {
     int voiceLanguage = 1; // VoiceLanguage
     int voiceMask = 0x7f;  // bit n = Voice n enabled
     bool audioAutoGain = true;
-    int bootMode = 0; // AiWorkModeType the camera starts in
+    int bootMode = 0;             // AiWorkModeType the camera starts in
+    int ledLevel = -1;            // status light brightness: 0 off, 1..3; -1 = not reported
+    bool hasSleepPicture = false; // a picture is set to show while asleep
+    int sleepPicture = 0;         // which saved picture (0..2)
+    bool sleepPictureMirrored = false;
 };
 
 struct Range {
@@ -92,7 +96,7 @@ struct Zone {
 // ---------------------------------------------------------------- directions
 //
 // The one place that decides which way is up. Every control (arrow keys, the
-// aim dial, click-to-aim, drag-to-steer, presets, the tracking-area editor)
+// aim pad, double-click-to-aim, drag-to-steer, presets, the tracking-area editor)
 // converts through these functions, so they can't disagree with each other.
 //
 // SDK frame, as OBSBOT documents it for the Tiny 2's angle calls:
@@ -142,6 +146,31 @@ inline double screenFromPitch(double pitch, const Orientation &o)
     return pitchSign(o) * pitch;
 }
 } // namespace axis
+
+// ---------------------------------------------------------------- the picture
+//
+// Where a point in the picture is, as angles from the picture's centre, and
+// back. x and y run 0..1 from the left and top; points outside the picture
+// are fine (the zone editor needs them). `fov` is the FovType setting
+// (diagonal 86, 78 or 65 degrees) and zoom is 0..100% (1x..4x on the Tiny 2).
+namespace view {
+struct Offset {
+    double rightDeg = 0; // + is to the picture's right
+    double upDeg = 0;    // + is up
+};
+// zoomMax is the camera's zoom at 100% (4x on the Tiny 2).
+Offset offsetFromPicture(double x, double y, int fov, int zoomPercent, double zoomMax = 4.0);
+void pictureFromOffset(const Offset &o, int fov, int zoomPercent, double &x, double &y, double zoomMax = 4.0);
+
+// The circle aim pad: a knob dragged (dx, dy) pixels from the centre of a pad
+// with the given radius gives a speed for each direction, -1..1. A little
+// dead zone in the middle; it eases in so small drags are gentle; beyond the
+// edge it's simply full speed in that direction.
+struct PadSpeed {
+    double up = 0, right = 0;
+};
+PadSpeed padSpeed(double dx, double dy, double radius);
+} // namespace view
 
 // How fast the gimbal glides to a new position. Fast = the camera's own
 // maximum, the others use a reference speed in degrees per second.
@@ -242,6 +271,10 @@ public:
     virtual bool goToPreset(int id) = 0;
     virtual bool deletePreset(int id) = 0;
     virtual bool renamePreset(int id, const std::string &name) = 0;
+
+    // The picture the camera shows while asleep (Tiny 2 keeps up to three).
+    virtual bool setSleepPicture(int index) = 0; // 0..2
+    virtual bool setSleepPictureMirrored(bool on) = 0;
 
     // Device
     virtual bool setGuideLight(bool on) = 0;

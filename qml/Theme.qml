@@ -35,6 +35,9 @@ QtObject {
     // Family details: the card edge, corner brackets and the one glow.
     readonly property color cardEdge: Qt.rgba(accent.r, accent.g, accent.b, 0.18)
     readonly property color glow: Qt.rgba(accent.r, accent.g, accent.b, 0.35)
+    // The camera's own status light is blue while it tracks you; Gimbot's
+    // tracking dot and frame match it (the same in both themes, on video).
+    readonly property color ledBlue: "#38bdf8"
 
     // The hull.
     readonly property color bg: dark ? "#0c1016" : "#f5f7fa"
@@ -74,4 +77,7 @@ QtObject {
     readonly property FontLoader interMedium: FontLoader { source: "fonts/Inter-Medium.ttf" }
     readonly property FontLoader interSemi: FontLoader { source: "fonts/Inter-SemiBold.ttf" }
     readonly property FontLoader interBold: FontLoader { source: "fonts/Inter-Bold.ttf" }
+    // Large titles only (house standard v1.3); body text stays Inter.
+    readonly property FontLoader displayLoader: FontLoader { source: "fonts/SpaceGrotesk-SemiBold.ttf" }
+    readonly property string displayFont: displayLoader.status === FontLoader.Ready ? displayLoader.name : font
 }

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Gimbot
 
 // Quick image toggles, brightness and white balance; focus, exposure and the
 // remaining sliders under More.
@@ -9,24 +11,24 @@ Card {
     id: root
     title: qsTr("Image")
     moreKey: "moreImage"
-    readonly property var v: cam.values
-    readonly property bool usable: cam.connected && !v.asleep
+    readonly property var v: Cam.values
+    readonly property bool usable: Cam.connected && !v.asleep
     readonly property bool narrow: width < 380 // white balance becomes a drop-down
     readonly property var wbNames: [qsTr("Auto"), qsTr("Daylight"), qsTr("Cloudy"), qsTr("Indoor"), qsTr("Fluorescent"), qsTr("Manual")]
     readonly property var wbTips: [qsTr("The camera picks the color for you"), qsTr("Sunlight"), qsTr("Overcast daylight"),
                                    qsTr("Warm indoor bulbs (tungsten)"), qsTr("Office tube lights"), qsTr("Set the temperature yourself")]
     note: v.asleep ? qsTr("The camera is asleep. Wake it to adjust the picture.") : ""
     noteAction: v.asleep ? qsTr("Wake") : ""
-    onNoteActivated: cam.set("asleep", false)
+    onNoteActivated: Cam.set("asleep", false)
 
     headerExtras: Btn {
         text: qsTr("Reset")
         iconName: "refresh"
         variant: "ghost"
         compact: true
-        enabled: cam.connected
+        enabled: Cam.connected
         tip: qsTr("Back to the camera's default picture settings. You can undo this.")
-        onClicked: cam.resetImage()
+        onClicked: Cam.resetImage()
     }
 
     GridLayout {
@@ -53,7 +55,7 @@ Card {
                 checked: on
                 Accessible.name: modelData.label
                 Accessible.description: modelData.tip
-                onClicked: cam.set(modelData.key, !on)
+                onClicked: Cam.set(modelData.key, !on)
                 Tip { visible: tile.hovered; text: tile.modelData.tip }
                 background: Rectangle {
                     radius: Theme.radius
@@ -88,10 +90,10 @@ Card {
     SliderRow {
         Layout.fillWidth: true
         label: qsTr("Brightness")
-        from: cam.ranges.brightness.min; to: cam.ranges.brightness.max; stepSize: 1
+        from: Cam.ranges.brightness.min; to: Cam.ranges.brightness.max; stepSize: 1
         value: root.v.brightness
         enabled: root.usable
-        onMoved: (x) => cam.set("brightness", Math.round(x))
+        onMoved: (x) => Cam.set("brightness", Math.round(x))
     }
 
     ColumnLayout {
@@ -111,7 +113,7 @@ Card {
                     selected: root.v.wbMode === index
                     enabled: root.usable
                     tip: root.wbTips[index]
-                    onClicked: cam.set("wbMode", index)
+                    onClicked: Cam.set("wbMode", index)
                 }
             }
         }
@@ -122,18 +124,18 @@ Card {
             currentIndex: root.v.wbMode
             enabled: root.usable
             accessibleName: qsTr("White balance")
-            onActivated: (i) => cam.set("wbMode", i)
+            onActivated: (i) => Cam.set("wbMode", i)
         }
         SliderRow {
             Layout.fillWidth: true
             visible: root.v.wbMode === 5
             label: qsTr("Temperature")
             tip: qsTr("Lower is warmer (orange), higher is cooler (blue)")
-            from: cam.ranges.wb.min; to: cam.ranges.wb.max; stepSize: 100
+            from: Cam.ranges.wb.min; to: Cam.ranges.wb.max; stepSize: 100
             value: root.v.wbKelvin
             valueText: root.v.wbKelvin + " K"
             enabled: root.usable
-            onMoved: (x) => cam.set("wbKelvin", Math.round(x / 100) * 100)
+            onMoved: (x) => Cam.set("wbKelvin", Math.round(x / 100) * 100)
         }
     }
 
@@ -151,7 +153,7 @@ Card {
                     accessibleName: qsTr("Focus")
                     currentIndex: root.v.autoFocus ? 0 : 1
                     enabled: root.usable
-                    onActivated: (i) => cam.set("autoFocus", i === 0)
+                    onActivated: (i) => Cam.set("autoFocus", i === 0)
                 }
             }
             SliderRow {
@@ -162,7 +164,7 @@ Card {
                 from: 0; to: 100; stepSize: 1
                 value: root.v.manualFocus
                 enabled: root.usable
-                onMoved: (x) => cam.set("manualFocus", Math.round(x))
+                onMoved: (x) => Cam.set("manualFocus", Math.round(x))
             }
         },
         ColumnLayout {
@@ -178,7 +180,7 @@ Card {
                     accessibleName: qsTr("Exposure")
                     currentIndex: root.v.exposureAuto ? 0 : 1
                     enabled: root.usable
-                    onActivated: (i) => cam.set("exposureAuto", i === 0)
+                    onActivated: (i) => Cam.set("exposureAuto", i === 0)
                 }
             }
             RowLayout {
@@ -193,11 +195,11 @@ Card {
                 }
                 Select {
                     implicitWidth: 130
-                    model: cam.shutterLabels
+                    model: Cam.shutterLabels
                     currentIndex: root.v.shutter - 9
                     enabled: root.usable
                     Accessible.name: qsTr("Shutter speed")
-                    onActivated: (i) => cam.set("shutter", i + 9)
+                    onActivated: (i) => Cam.set("shutter", i + 9)
                 }
             }
             Text {
@@ -213,27 +215,27 @@ Card {
         SliderRow {
             Layout.fillWidth: true
             label: qsTr("Contrast")
-            from: cam.ranges.contrast.min; to: cam.ranges.contrast.max; stepSize: 1
+            from: Cam.ranges.contrast.min; to: Cam.ranges.contrast.max; stepSize: 1
             value: root.v.contrast
             enabled: root.usable
-            onMoved: (x) => cam.set("contrast", Math.round(x))
+            onMoved: (x) => Cam.set("contrast", Math.round(x))
         },
         SliderRow {
             Layout.fillWidth: true
             label: qsTr("Saturation")
-            from: cam.ranges.saturation.min; to: cam.ranges.saturation.max; stepSize: 1
+            from: Cam.ranges.saturation.min; to: Cam.ranges.saturation.max; stepSize: 1
             value: root.v.saturation
             enabled: root.usable
-            onMoved: (x) => cam.set("saturation", Math.round(x))
+            onMoved: (x) => Cam.set("saturation", Math.round(x))
         },
         SliderRow {
             Layout.fillWidth: true
             label: qsTr("Hue")
             tip: qsTr("Shifts all colors around the color wheel. Usually best left in the middle.")
-            from: cam.ranges.hue.min; to: cam.ranges.hue.max; stepSize: 1
+            from: Cam.ranges.hue.min; to: Cam.ranges.hue.max; stepSize: 1
             value: root.v.hue
             enabled: root.usable
-            onMoved: (x) => cam.set("hue", Math.round(x))
+            onMoved: (x) => Cam.set("hue", Math.round(x))
         },
         RowLayout {
             Layout.fillWidth: true
@@ -253,16 +255,16 @@ Card {
                 currentIndex: root.v.antiFlicker
                 enabled: root.usable
                 accessibleName: qsTr("Anti-flicker")
-                onActivated: (i) => cam.set("antiFlicker", i)
+                onActivated: (i) => Cam.set("antiFlicker", i)
             }
         },
         SliderRow {
             Layout.fillWidth: true
             label: qsTr("Sharpness")
-            from: cam.ranges.sharpness.min; to: cam.ranges.sharpness.max; stepSize: 1
+            from: Cam.ranges.sharpness.min; to: Cam.ranges.sharpness.max; stepSize: 1
             value: root.v.sharpness
             enabled: root.usable
-            onMoved: (x) => cam.set("sharpness", Math.round(x))
+            onMoved: (x) => Cam.set("sharpness", Math.round(x))
         }
     ]
 

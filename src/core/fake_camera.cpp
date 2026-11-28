@@ -22,6 +22,8 @@ public:
     FakeCamera()
     {
         s_.valid = true;
+        s_.ledLevel = 2; // like a Tiny 2 out of the box
+        s_.hasSleepPicture = true;
         s_.mode = Mode::Person;
         s_.framing = 1;
         s_.autoFocus = true;
@@ -109,7 +111,7 @@ public:
         if (fail_) return false;
         pitchSpeed_ = yawSpeed_ = 0;
         pos_.pitch = std::clamp(pitch, -90.f, 90.f);
-        pos_.yaw = std::clamp(yaw, -140.f, 140.f);
+        pos_.yaw = std::clamp(yaw, -120.f, 120.f);
         return true;
     }
     bool recenter() override { return moveTo(0, 0); }
@@ -272,6 +274,14 @@ public:
     }
 
     bool setGuideLight(bool) override { return !fail_; }
+    bool setSleepPicture(int index) override
+    {
+        return change([&] { s_.sleepPicture = std::clamp(index, 0, 2); });
+    }
+    bool setSleepPictureMirrored(bool on) override
+    {
+        return change([&] { s_.sleepPictureMirrored = on; });
+    }
     bool factoryReset() override
     {
         {
@@ -325,7 +335,7 @@ private:
         const double dt = std::chrono::duration<double>(now - last_).count();
         last_ = now;
         pos_.pitch = std::clamp(static_cast<float>(pos_.pitch + pitchSpeed_ * dt), -90.f, 90.f);
-        pos_.yaw = std::clamp(static_cast<float>(pos_.yaw + yawSpeed_ * dt), -140.f, 140.f);
+        pos_.yaw = std::clamp(static_cast<float>(pos_.yaw + yawSpeed_ * dt), -120.f, 120.f);
     }
 
     mutable std::mutex m_;

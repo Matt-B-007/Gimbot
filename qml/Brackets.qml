@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+pragma ComponentBehavior: Bound
 import QtQuick
 
 // Small accent corner brackets that mark the focused or active card (the

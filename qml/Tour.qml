@@ -13,11 +13,11 @@ Popup {
         { target: "tracking", title: qsTr("Tracking"),
           text: qsTr("This switch turns tracking on and off. Pick what to track (Person, Group, Hand…) on the bar at the bottom of the picture.") },
         { target: "preview", title: qsTr("Point the camera"),
-          text: qsTr("Click anywhere in the picture to point the camera there. Press and drag to steer, scroll to zoom. The arrow keys work too.") },
+          text: qsTr("Double-click anywhere in the picture to point the camera there. Press and drag to steer, scroll to zoom. The arrow keys work too.") },
         { target: "presets", title: qsTr("Presets"),
-          text: qsTr("Save the current view and come back to it with one click, or with Ctrl+1, 2, 3.") },
+          text: qsTr("Save the current view and come back to it with one click, or with Ctrl+1, 2, 3. The camera holds three.") },
         { target: "bar", title: qsTr("Find anything"),
-          text: qsTr("Press Ctrl+K to search every command. Help (?) has this tour, shortcuts and bug reports.") }
+          text: qsTr("Press Ctrl+K to search every command. Help, the ? at the bottom left, has this tour, shortcuts and bug reports.") }
     ]
     readonly property Item target: targets ? targets[steps[step].target] : null
     readonly property rect hole: {

@@ -2,37 +2,38 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Gimbot
 
 // What's new, then one click to install the update.
 Sheet {
     id: root
     maxWidth: 560
     iconName: "download"
-    readonly property bool rebuilding: updater.installAction === "rebuild"
-    readonly property bool goingBack: updater.installAction === "rollback"
-    title: goingBack ? (updater.installState === "done" ? qsTr("Went back to the previous version")
-                        : updater.installState === "failed" ? qsTr("Going back didn't finish")
+    readonly property bool rebuilding: Updater.installAction === "rebuild"
+    readonly property bool goingBack: Updater.installAction === "rollback"
+    title: goingBack ? (Updater.installState === "done" ? qsTr("Went back to the previous version")
+                        : Updater.installState === "failed" ? qsTr("Going back didn't finish")
                         : qsTr("Going back to the previous version"))
-         : rebuilding ? (updater.installState === "done" ? qsTr("Rebuilt with the new SDK")
-                         : updater.installState === "failed" ? qsTr("The rebuild didn't finish")
+         : rebuilding ? (Updater.installState === "done" ? qsTr("Rebuilt with the new SDK")
+                         : Updater.installState === "failed" ? qsTr("The rebuild didn't finish")
                          : qsTr("Rebuilding Gimbot with the new OBSBOT SDK"))
-         : updater.installState === "done" ? qsTr("Update installed")
-         : updater.installState === "failed" ? qsTr("The update didn't finish")
-         : updater.installState === "running" ? qsTr("Updating to Gimbot %1").arg(updater.latestVersion)
-         : updater.isSwitch ? qsTr("Switch to Gimbot %1").arg(updater.latestVersion)
-         : qsTr("Gimbot %1 is available").arg(updater.latestVersion)
-    closePolicy: updater.installState === "running" ? Popup.NoAutoClose : (Popup.CloseOnEscape | Popup.CloseOnPressOutside)
+         : Updater.installState === "done" ? qsTr("Update installed")
+         : Updater.installState === "failed" ? qsTr("The update didn't finish")
+         : Updater.installState === "running" ? qsTr("Updating to Gimbot %1").arg(Updater.latestVersion)
+         : Updater.isSwitch ? qsTr("Switch to Gimbot %1").arg(Updater.latestVersion)
+         : qsTr("Gimbot %1 is available").arg(Updater.latestVersion)
+    closePolicy: Updater.installState === "running" ? Popup.NoAutoClose : (Popup.CloseOnEscape | Popup.CloseOnPressOutside)
     signal reportRequested()
 
-    readonly property bool idle: updater.installState === "idle"
-    readonly property bool running: updater.installState === "running"
+    readonly property bool idle: Updater.installState === "idle"
+    readonly property bool running: Updater.installState === "running"
 
     // Release notes, before installing.
     RowLayout {
         visible: root.idle
         spacing: 8
         Rectangle {
-            visible: updater.latestIsBeta
+            visible: Updater.latestIsBeta
             implicitWidth: betaLabel.implicitWidth + 16
             implicitHeight: 24
             radius: 12
@@ -40,8 +41,8 @@ Sheet {
             Text { id: betaLabel; anchors.centerIn: parent; text: qsTr("Beta"); color: Theme.warning; font.family: Theme.font; font.pixelSize: Theme.small; font.weight: Font.DemiBold }
         }
         Text {
-            text: updater.isSwitch ? qsTr("You're on beta %1. This installs the newest normal version.").arg(platform.version)
-                                   : qsTr("You have %1.").arg(platform.version)
+            text: Updater.isSwitch ? qsTr("You're on beta %1. This installs the newest normal version.").arg(Platform.version)
+                                   : qsTr("You have %1.").arg(Platform.version)
             color: Theme.textMuted
             font.family: Theme.font
             font.pixelSize: Theme.small + 1
@@ -59,14 +60,14 @@ Sheet {
             id: notes
             width: root.availableWidth - 24
             x: 12; y: 12
-            text: updater.latestNotes.length > 0 ? updater.latestNotes : qsTr("No release notes were published for this version.")
+            text: Updater.latestNotes.length > 0 ? Updater.latestNotes : qsTr("No release notes were published for this version.")
             textFormat: Text.MarkdownText
             wrapMode: Text.WordWrap
             color: Theme.text
             linkColor: Theme.accentText
             font.family: Theme.font
             font.pixelSize: Theme.fontSize - 1
-            onLinkActivated: (link) => platform.openUrl(link)
+            onLinkActivated: (link) => Platform.openUrl(link)
         }
     }
     Text {
@@ -87,8 +88,8 @@ Sheet {
         RowLayout {
             Layout.fillWidth: true
             Text {
-                text: updater.installState === "failed" ? updater.installError : updater.installStatus
-                color: updater.installState === "failed" ? Theme.danger : Theme.text
+                text: Updater.installState === "failed" ? Updater.installError : Updater.installStatus
+                color: Updater.installState === "failed" ? Theme.danger : Theme.text
                 font.family: Theme.font
                 font.pixelSize: Theme.fontSize
                 wrapMode: Text.WordWrap
@@ -96,7 +97,7 @@ Sheet {
             }
             Text {
                 visible: root.running
-                text: updater.installProgress + "%"
+                text: Updater.installProgress + "%"
                 color: Theme.textMuted
                 font.family: Theme.font
                 font.pixelSize: Theme.fontSize - 1
@@ -108,15 +109,15 @@ Sheet {
             radius: 3
             color: Theme.sunken
             Rectangle {
-                width: parent.width * Math.max(0.02, updater.installProgress / 100)
+                width: parent.width * Math.max(0.02, Updater.installProgress / 100)
                 height: parent.height
                 radius: 3
-                color: updater.installState === "failed" ? Theme.danger : updater.installState === "done" ? Theme.success : Theme.accent
+                color: Updater.installState === "failed" ? Theme.danger : Updater.installState === "done" ? Theme.success : Theme.accent
                 Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
             }
         }
         Text {
-            visible: updater.installState === "done"
+            visible: Updater.installState === "done"
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
             text: qsTr("Restart Gimbot to start using the new version.")
@@ -126,7 +127,7 @@ Sheet {
         }
         Btn {
             id: logToggle
-            property bool open: updater.installState === "failed"
+            property bool open: Updater.installState === "failed"
             text: open ? qsTr("Hide details") : qsTr("Show details")
             iconName: open ? "chevron-up" : "chevron-down"
             variant: "ghost"
@@ -142,7 +143,7 @@ Sheet {
             background: Rectangle { radius: Theme.radiusSm + 2; color: Theme.sunken; border.color: Theme.border }
             TextArea {
                 readOnly: true
-                text: updater.installLog
+                text: Updater.installLog
                 wrapMode: TextArea.NoWrap
                 color: Theme.textMuted
                 font.family: "monospace"
@@ -160,10 +161,10 @@ Sheet {
             text: qsTr("Release page")
             iconName: "external"
             variant: "ghost"
-            onClicked: platform.openUrl(updater.latestUrl)
+            onClicked: Platform.openUrl(Updater.latestUrl)
         },
         Btn {
-            visible: updater.installState === "failed"
+            visible: Updater.installState === "failed"
             text: qsTr("Report the problem")
             iconName: "bug"
             variant: "ghost"
@@ -171,7 +172,7 @@ Sheet {
         },
         Item { Layout.fillWidth: true },
         Btn {
-            visible: root.idle || updater.installState === "failed"
+            visible: root.idle || Updater.installState === "failed"
             text: qsTr("Later")
             variant: "ghost"
             onClicked: root.close()
@@ -180,23 +181,23 @@ Sheet {
             visible: root.running
             text: qsTr("Cancel")
             variant: "ghost"
-            onClicked: updater.cancelInstall()
+            onClicked: Updater.cancelInstall()
         },
         Btn {
-            visible: root.idle || updater.installState === "failed"
-            text: updater.installState === "failed" ? qsTr("Try again") : updater.isSwitch ? qsTr("Switch now") : qsTr("Update now")
+            visible: root.idle || Updater.installState === "failed"
+            text: Updater.installState === "failed" ? qsTr("Try again") : Updater.isSwitch ? qsTr("Switch now") : qsTr("Update now")
             iconName: "download"
             variant: "primary"
             glow: true // the screen's one main action
-            onClicked: root.rebuilding ? updater.rebuild() : updater.install()
+            onClicked: root.rebuilding ? Updater.rebuild() : Updater.install()
         },
         Btn {
-            visible: updater.installState === "done"
+            visible: Updater.installState === "done"
             text: qsTr("Restart Gimbot")
             iconName: "refresh"
             variant: "primary"
             glow: true // the screen's one main action
-            onClicked: updater.restartApp()
+            onClicked: Updater.restartApp()
         }
     ]
 }

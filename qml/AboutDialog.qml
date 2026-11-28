@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Layouts
+import Gimbot
 
 Sheet {
     id: root
@@ -25,7 +26,7 @@ Sheet {
         }
         Text {
             Layout.alignment: Qt.AlignHCenter
-            text: qsTr("Version %1").arg(platform.version)
+            text: qsTr("Version %1").arg(Platform.version)
             color: Theme.textMuted
             font.family: Theme.font
             font.pixelSize: Theme.fontSize
@@ -48,9 +49,9 @@ Sheet {
             columnSpacing: 16
             rowSpacing: 6
             Repeater {
-                model: [qsTr("OBSBOT SDK"), platform.sdkVersion, qsTr("Qt"), platform.qtVersion,
-                        qsTr("KDE integration"), platform.kdeIntegration ? qsTr("Yes") : qsTr("No"),
-                        qsTr("Camera firmware"), cam.connected ? cam.firmware : "—", qsTr("License"), "MIT"]
+                model: [qsTr("OBSBOT SDK"), Platform.sdkVersion, qsTr("Qt"), Platform.qtVersion,
+                        qsTr("KDE integration"), Platform.kdeIntegration ? qsTr("Yes") : qsTr("No"),
+                        qsTr("Camera firmware"), Cam.connected ? Cam.firmware : "—", qsTr("License"), "MIT"]
                 Text {
                     required property int index
                     required property string modelData
@@ -67,7 +68,7 @@ Sheet {
             Layout.fillWidth: true
             Layout.topMargin: 8
             wrapMode: Text.WordWrap
-            text: qsTr("Uses the Inter typeface (SIL Open Font License) and the OBSBOT SDK, which is © Remo Tech and not covered by Gimbot's license.")
+            text: qsTr("Uses the Inter and Space Grotesk typefaces (SIL Open Font License) and the OBSBOT SDK, which is © Remo Tech and not covered by Gimbot's license.")
             color: Theme.textFaint
             font.family: Theme.font
             font.pixelSize: Theme.small - 1
@@ -75,7 +76,7 @@ Sheet {
     }
 
     buttons: [
-        Btn { visible: platform.repoUrl.length > 0; text: qsTr("Project page"); iconName: "external"; variant: "ghost"; onClicked: platform.openUrl(platform.repoUrl) },
+        Btn { visible: Platform.repoUrl.length > 0; text: qsTr("Project page"); iconName: "external"; variant: "ghost"; onClicked: Platform.openUrl(Platform.repoUrl) },
         Item { Layout.fillWidth: true },
         Btn { text: qsTr("Close"); variant: "primary"; onClicked: root.close() }
     ]

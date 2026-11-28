@@ -53,27 +53,65 @@ int glideZoomSpeed(Smoothness s)
     return 0;
 }
 
+namespace {
+constexpr double kPi = 3.14159265358979323846;
+
+// Half the picture's width and height as tangents. The field of view setting
+// is diagonal; for a 16:9 picture each one works out as below. Zoom narrows
+// it (0..100% is 1x..zoomMax; 4x on the Tiny 2).
+void halfTangents(int fov, int zoomPercent, double zoomMax, double &tanHalfH, double &tanHalfV)
+{
+    constexpr double kDiag[] = {86, 78, 65};
+    const double diag = kDiag[std::clamp(fov, 0, 2)] * kPi / 180;
+    const double d = std::sqrt(16.0 * 16 + 9 * 9);
+    const double zoom = 1.0 + (std::max(1.0, zoomMax) - 1.0) * std::clamp(zoomPercent, 0, 100) / 100.0;
+    tanHalfH = std::tan(diag / 2) * 16 / d / zoom;
+    tanHalfV = std::tan(diag / 2) * 9 / d / zoom;
+}
+} // namespace
+
+view::Offset view::offsetFromPicture(double x, double y, int fov, int zoomPercent, double zoomMax)
+{
+    double th, tv;
+    halfTangents(fov, zoomPercent, zoomMax, th, tv);
+    const double right = x * 2 - 1; // -1 left .. 1 right
+    const double up = 1 - y * 2;    // -1 bottom .. 1 top
+    return {std::atan(th * right) * 180 / kPi, std::atan(tv * up) * 180 / kPi};
+}
+
+void view::pictureFromOffset(const Offset &o, int fov, int zoomPercent, double &x, double &y, double zoomMax)
+{
+    double th, tv;
+    halfTangents(fov, zoomPercent, zoomMax, th, tv);
+    // Beyond 89 degrees the tangent runs away; nothing that far is drawable.
+    const double r = std::clamp(o.rightDeg, -89.0, 89.0) * kPi / 180;
+    const double u = std::clamp(o.upDeg, -89.0, 89.0) * kPi / 180;
+    x = (std::tan(r) / th + 1) / 2;
+    y = (1 - std::tan(u) / tv) / 2;
+}
+
+view::PadSpeed view::padSpeed(double dx, double dy, double radius)
+{
+    if (radius <= 0) return {};
+    double nx = dx / radius, ny = -dy / radius; // screen y grows downwards
+    const double len = std::hypot(nx, ny);
+    constexpr double kDead = 0.08;
+    if (len < kDead) return {};
+    // Past the edge: full speed in that direction.
+    const double reach = std::min(1.0, (len - kDead) / (1 - kDead));
+    const double eased = std::pow(reach, 1.5);
+    return {ny / len * eased, nx / len * eased};
+}
+
 bool Camera::aimAt(double x, double y, const axis::Orientation &o, float speed)
 {
-    // Angles from the picture's centre to the clicked point. The field of
-    // view setting is diagonal; for a 16:9 picture each one works out as
-    // below. Zoom narrows it (0..100% is 1x..4x on the Tiny 2).
-    constexpr double kPi = 3.14159265358979323846;
-    constexpr double kDiag[] = {86, 78, 65};
     const Status st = status();
-    const double diag = kDiag[std::clamp(st.fov, 0, 2)] * kPi / 180;
-    const double d = std::sqrt(16.0 * 16 + 9 * 9);
-    const double tanHalfH = std::tan(diag / 2) * 16 / d;
-    const double tanHalfV = std::tan(diag / 2) * 9 / d;
     GimbalPos pos;
     if (!position(pos)) return false;
-    const double zoom = 1.0 + 3.0 * st.zoomPercent / 100.0;
-    const double right = std::clamp(x, 0.0, 1.0) * 2 - 1; // -1 left .. 1 right
-    const double up = 1 - std::clamp(y, 0.0, 1.0) * 2;    // -1 bottom .. 1 top
-    const double rightDeg = std::atan(tanHalfH * right / zoom) * 180 / kPi;
-    const double upDeg = std::atan(tanHalfV * up / zoom) * 180 / kPi;
-    return moveTo(static_cast<float>(pos.pitch + axis::pitchFromScreen(upDeg, o)),
-                  static_cast<float>(pos.yaw + axis::yawFromScreen(rightDeg, o)), speed);
+    const auto off =
+        view::offsetFromPicture(std::clamp(x, 0.0, 1.0), std::clamp(y, 0.0, 1.0), st.fov, st.zoomPercent, maxZoom());
+    return moveTo(static_cast<float>(pos.pitch + axis::pitchFromScreen(off.upDeg, o)),
+                  static_cast<float>(pos.yaw + axis::yawFromScreen(off.rightDeg, o)), speed);
 }
 
 bool Camera::glideToPreset(int id, float speed, int zoomSpeed)

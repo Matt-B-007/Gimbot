@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Gimbot
 
 // The main screen: preview, presets and the control cards.
 FocusScope {
@@ -26,6 +27,14 @@ FocusScope {
 
     readonly property alias preview: previewView
     readonly property bool wide: width >= 1080
+    property int compactTab: 0 // which card shows in a narrow window
+    property bool zoneEditing: false // drawing the tracking zone on the picture
+    // Nothing to draw on without a picture: asleep or unplugged ends it.
+    readonly property bool canEditZone: Cam.connected && !Cam.values.asleep
+    onCanEditZoneChanged: if (!canEditZone) zoneEditing = false
+    onZoneEditingChanged: if (zoneEditing && !canEditZone) zoneEditing = false
+    property bool readmePicture: false // screenshots for the README: no pending update shown
+    property alias previewError: previewView.error // screenshots of the "busy" state
 
     readonly property alias tourTargets: tourTargets
     QtObject {
@@ -53,36 +62,41 @@ FocusScope {
             return cur + Math.max(-r, Math.min(r, target - cur))
         }
         onTriggered: {
-            const level = Math.max(0, Math.min(3, cam.values.smoothness))
+            const level = Math.max(0, Math.min(3, Cam.values.smoothness))
             const up = [1, 0.25, 0.12, 0.07][level]   // share of full speed added per tick
             const down = [1, 0.34, 0.18, 0.1][level]
             root.curTilt = approach(root.curTilt, root.heldTilt, up, down)
             root.curPan = approach(root.curPan, root.heldPan, up, down)
             if (root.curTilt === 0 && root.curPan === 0) {
                 stop()
-                cam.stopMove()
+                Cam.stopMove()
             } else {
-                cam.move(root.curTilt, root.curPan)
+                Cam.move(root.curTilt, root.curPan)
             }
         }
     }
-    Keys.onPressed: (e) => {
+    // The scrolling areas would otherwise take the arrow keys for themselves
+    // once a button inside them has been clicked, so each of them hands its
+    // keys here first (see "Keys.priority" below).
+    Keys.onPressed: (e) => root.keyDown(e)
+    Keys.onReleased: (e) => root.keyUp(e)
+    function keyDown(e) {
         if (e.isAutoRepeat) { e.accepted = [Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right].includes(e.key); return }
         switch (e.key) {
         case Qt.Key_Up: heldTilt = 1; break
         case Qt.Key_Down: heldTilt = -1; break
         case Qt.Key_Left: heldPan = -1; break
         case Qt.Key_Right: heldPan = 1; break
-        case Qt.Key_Home: cam.recenter(); e.accepted = true; return
-        case Qt.Key_Plus: case Qt.Key_Equal: cam.zoomBy(10); e.accepted = true; return
-        case Qt.Key_Minus: cam.zoomBy(-10); e.accepted = true; return
+        case Qt.Key_Home: Cam.recenter(); e.accepted = true; return
+        case Qt.Key_Plus: case Qt.Key_Equal: Cam.zoomBy(10); e.accepted = true; return
+        case Qt.Key_Minus: Cam.zoomBy(-10); e.accepted = true; return
         case Qt.Key_Question: root.openShortcuts(); e.accepted = true; return
         default: return
         }
         e.accepted = true
         updateMove()
     }
-    Keys.onReleased: (e) => {
+    function keyUp(e) {
         if (e.isAutoRepeat) return
         if (e.key === Qt.Key_Up || e.key === Qt.Key_Down) heldTilt = 0
         else if (e.key === Qt.Key_Left || e.key === Qt.Key_Right) heldPan = 0
@@ -100,6 +114,7 @@ FocusScope {
         TopBar {
             id: topBar
             Layout.fillWidth: true
+            hideUpdate: root.readmePicture
             onOpenPalette: root.openPalette()
             onOpenSettings: root.openSettings()
             onOpenProfiles: root.openSection("profiles")
@@ -108,80 +123,76 @@ FocusScope {
             onOpenReport: root.openReport()
             onOpenAbout: root.openAbout()
             onOpenShortcuts: root.openShortcuts()
+            onOpenUpdate: root.openUpdate()
         }
 
-        StatusStrip {
-            Layout.fillWidth: true
-            previewError: previewView.error
-            videoSize: previewView.videoSize
-            videoFps: previewView.videoFps
-            onRetryPreview: previewView.retry()
-            onOpenArea: root.openSection("area")
-        }
 
         Banner {
             Layout.fillWidth: true
-            visible: platform.previousSessionCrashed
+            visible: Platform.previousSessionCrashed
             iconName: "alert"
             tint: Theme.warning
             text: qsTr("Gimbot closed unexpectedly last time. A report helps get it fixed.")
             actionText: qsTr("Report the problem")
-            onAction: { root.openReport(); platform.dismissCrash() }
-            onDismissed: platform.dismissCrash()
+            onAction: { root.openReport(); Platform.dismissCrash() }
+            onDismissed: Platform.dismissCrash()
         }
         Banner { // once after an update
             Layout.fillWidth: true
             visible: root.updatedFrom.length > 0
             iconName: "check"
             tint: Theme.success
-            text: qsTr("Gimbot was updated to %1.").arg(platform.version)
-            actionText: platform.repoUrl ? qsTr("What's new") : ""
-            onAction: platform.openUrl(platform.repoUrl + "/releases/tag/v" + platform.version)
+            text: qsTr("Gimbot was updated to %1.").arg(Platform.version)
+            actionText: Platform.repoUrl ? qsTr("What's new") : ""
+            onAction: Platform.openUrl(Platform.repoUrl + "/releases/tag/v" + Platform.version)
             secondaryText: qsTr("Show the tour")
             onSecondary: { root.updatedFrom = ""; root.openTour() }
             onDismissed: root.updatedFrom = ""
         }
         Banner {
             Layout.fillWidth: true
-            visible: (updater.state === "available" && !root.updateDismissed) || updater.installState !== "idle"
-            readonly property string install: updater.installState
+            visible: Updater.installState !== "idle" // "available" is the top bar's Update ready button
+            readonly property string install: Updater.installState
             tint: install === "done" ? Theme.success : install === "failed" ? Theme.danger : Theme.accent
             iconName: "download"
             text: {
-                if (install === "running") return qsTr("Updating to Gimbot %1… %2%").arg(updater.latestVersion).arg(updater.installProgress)
-                if (install === "done") return qsTr("Gimbot %1 is installed. Restart to start using it.").arg(updater.latestVersion)
-                if (install === "failed") return qsTr("The update didn't finish: %1").arg(updater.installError)
-                const name = updater.latestIsBeta ? qsTr("Gimbot %1 (beta)").arg(updater.latestVersion) : qsTr("Gimbot %1").arg(updater.latestVersion)
-                if (updater.isSwitch) return qsTr("%1, the newest normal version, is available.").arg(name)
-                return updater.canInstall ? qsTr("%1 is available.").arg(name)
+                if (install === "running") return qsTr("Updating to Gimbot %1… %2%").arg(Updater.latestVersion).arg(Updater.installProgress)
+                if (install === "done") return qsTr("Gimbot %1 is installed. Restart to start using it.").arg(Updater.latestVersion)
+                if (install === "failed") return qsTr("The update didn't finish: %1").arg(Updater.installError)
+                const name = Updater.latestIsBeta ? qsTr("Gimbot %1 (beta)").arg(Updater.latestVersion) : qsTr("Gimbot %1").arg(Updater.latestVersion)
+                if (Updater.isSwitch) return qsTr("%1, the newest normal version, is available.").arg(name)
+                return Updater.canInstall ? qsTr("%1 is available.").arg(name)
                                           : qsTr("%1 is available. Update it with your package manager.").arg(name)
             }
-            secondaryText: install === "idle" && updater.canInstall ? qsTr("What's new") : ""
+            secondaryText: install === "idle" && Updater.canInstall ? qsTr("What's new") : ""
             onSecondary: root.openUpdate()
             actionText: install === "running" ? qsTr("Show")
                       : install === "done" ? qsTr("Restart Gimbot")
                       : install === "failed" ? qsTr("Details")
-                      : updater.canInstall ? (updater.isSwitch ? qsTr("Switch now") : qsTr("Update now")) : qsTr("What's new")
+                      : Updater.canInstall ? (Updater.isSwitch ? qsTr("Switch now") : qsTr("Update now")) : qsTr("What's new")
             onAction: {
-                if (install === "done") updater.restartApp()
-                else if (updater.canInstall) root.openUpdate()
-                else platform.openUrl(updater.latestUrl)
+                if (install === "done") Updater.restartApp()
+                else if (Updater.canInstall) root.openUpdate()
+                else Platform.openUrl(Updater.latestUrl)
             }
             onDismissed: root.updateDismissed = true
         }
         Banner { // a newer OBSBOT SDK was found in Downloads
             Layout.fillWidth: true
-            visible: platform.newSdkPath.length > 0 && !root.sdkDismissed && updater.installState === "idle"
+            visible: Platform.newSdkPath.length > 0 && !root.sdkDismissed && Updater.installState === "idle"
             iconName: "download"
             tint: Theme.accent
-            text: qsTr("A newer OBSBOT SDK (%1) is in your Downloads. Move it into Gimbot's folder and rebuild Gimbot with it?").arg(platform.newSdkVersion)
-            actionText: updater.canInstall ? qsTr("Move and rebuild") : qsTr("Move it")
+            text: qsTr("A newer OBSBOT SDK (%1) is in your Downloads. Move it into Gimbot's folder and rebuild Gimbot with it?").arg(Platform.newSdkVersion)
+            actionText: Updater.canInstall ? qsTr("Move and rebuild") : qsTr("Move it")
             onAction: {
-                if (platform.adoptSdk(platform.newSdkPath) && updater.canInstall) updater.rebuild()
+                if (Platform.adoptSdk(Platform.newSdkPath) && Updater.canInstall) Updater.rebuild()
             }
             onDismissed: root.sdkDismissed = true
         }
 
+        // Wide window: the picture's column and the cards' column scroll
+        // on their own, so the picture stays put while you change a card.
+        // Narrow window: one column, and the whole page scrolls.
         ScrollView {
             id: scroller
             Layout.fillWidth: true
@@ -189,6 +200,9 @@ FocusScope {
             contentWidth: availableWidth
             clip: true
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            Keys.priority: Keys.BeforeItem
+            Keys.onPressed: (e) => root.keyDown(e)
+            Keys.onReleased: (e) => root.keyUp(e)
 
             GridLayout {
                 width: scroller.availableWidth
@@ -196,57 +210,113 @@ FocusScope {
                 columnSpacing: 16
                 rowSpacing: 16
 
-                ColumnLayout {
+                ScrollView {
+                    id: leftScroll
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignTop
-                    spacing: 16
-                    Preview {
-                        id: previewView
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: width * 9 / 16
-                        windowVisible: root.windowVisible && root.visible
-                    }
-                    PresetStrip {
-                        id: presetStrip
-                        Layout.fillWidth: true
-                        onSaveRequested: root.savePreset()
-                        onRenameRequested: (id, name) => root.renamePreset(id, name)
-                        onDeleteRequested: (id, name) => root.deletePreset(id, name)
+                    Layout.preferredHeight: root.wide ? scroller.availableHeight : leftColumn.implicitHeight
+                    contentWidth: availableWidth
+                    clip: root.wide
+                    rightPadding: root.wide && leftColumn.implicitHeight > height ? 12 : 0 // room for the scroll bar
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    Keys.priority: Keys.BeforeItem
+                    Keys.onPressed: (e) => root.keyDown(e)
+                    Keys.onReleased: (e) => root.keyUp(e)
+                    ColumnLayout {
+                        id: leftColumn
+                        width: leftScroll.availableWidth
+                        spacing: 16
+                        Preview {
+                            id: previewView
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: width * 9 / 16
+                            windowVisible: root.windowVisible && root.visible
+                            zoneEditing: root.zoneEditing
+                        }
+                        ZoneRangeBar {
+                            Layout.fillWidth: true
+                            visible: root.zoneEditing
+                        }
+                        PresetStrip {
+                            id: presetStrip
+                            Layout.fillWidth: true
+                            onSaveRequested: root.savePreset()
+                            onRenameRequested: (id, name) => root.renamePreset(id, name)
+                            onDeleteRequested: (id, name) => root.deletePreset(id, name)
+                        }
+                        StatusStrip {
+                            Layout.fillWidth: true
+                            previewError: previewView.error
+                            videoSize: previewView.videoSize
+                            videoFps: previewView.videoFps
+                            onRetryPreview: previewView.retry()
+                            onOpenArea: root.zoneEditing = true
+                        }
                     }
                 }
 
-                ColumnLayout {
+                ScrollView {
+                    id: rightScroll
                     Layout.alignment: Qt.AlignTop
                     Layout.fillWidth: !root.wide
-                    Layout.preferredWidth: root.wide ? 340 : -1
-                    Layout.maximumWidth: root.wide ? 360 : 100000
-                    spacing: 12
-                    TrackingCard {
-                        id: trackingCard
-                        Layout.fillWidth: true
-                        onOpenArea: root.openSection("area")
-                        onOpenVoice: root.openSection("voice")
-                    }
-                    AimCard { Layout.fillWidth: true }
-                    ImageCard { Layout.fillWidth: true }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 6
-                        Layout.rightMargin: 6
-                        Text {
-                            text: cam.connected ? qsTr("Firmware %1").arg(cam.firmware) : ""
-                            color: Theme.textFaint
-                            font.family: Theme.font
-                            font.pixelSize: Theme.small
+                    Layout.preferredWidth: root.wide ? 340 + rightPadding : -1
+                    Layout.preferredHeight: root.wide ? scroller.availableHeight : rightColumn.implicitHeight
+                    contentWidth: availableWidth
+                    clip: root.wide
+                    rightPadding: root.wide && rightColumn.implicitHeight > height ? 12 : 0
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    Keys.priority: Keys.BeforeItem
+                    Keys.onPressed: (e) => root.keyDown(e)
+                    Keys.onReleased: (e) => root.keyUp(e)
+                    ColumnLayout {
+                        id: rightColumn
+                        width: rightScroll.availableWidth
+                        spacing: 12
+                        // In a narrow window the cards share the space as tabs.
+                        Segmented {
+                            id: cardTabs
                             Layout.fillWidth: true
+                            visible: !root.wide && !root.zoneEditing
+                            options: [qsTr("Tracking"), qsTr("Aim"), qsTr("Image")]
+                            accessibleName: qsTr("Controls")
+                            currentIndex: root.compactTab
+                            onActivated: (i) => root.compactTab = i
                         }
-                        Text {
-                            text: qsTr("Firmware updates: OBSBOT Center")
-                            color: Theme.textFaint
-                            font.family: Theme.font
-                            font.pixelSize: Theme.small
-                            HoverHandler { id: fwHover }
-                            Tip { visible: fwHover.hovered; text: qsTr("The OBSBOT SDK can't update the camera's firmware. Use OBSBOT Center on Windows or macOS.") }
+                        ZonePanel {
+                            Layout.fillWidth: true
+                            visible: root.zoneEditing
+                            onDone: root.zoneEditing = false
+                            onMoreSettings: { root.zoneEditing = false; root.openSection("area") }
+                        }
+                        TrackingCard {
+                            id: trackingCard
+                            visible: !root.zoneEditing && (root.wide || root.compactTab === 0)
+                            Layout.fillWidth: true
+                            onOpenArea: root.zoneEditing = true
+                            onOpenVoice: root.openSection("voice")
+                        }
+                        AimCard { Layout.fillWidth: true; visible: !root.zoneEditing && (root.wide || root.compactTab === 1) }
+                        ImageCard { Layout.fillWidth: true; visible: !root.zoneEditing && (root.wide || root.compactTab === 2) }
+                        StatusLightCard { Layout.fillWidth: true; visible: !root.zoneEditing && (root.wide || root.compactTab === 2) }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: 6
+                            Layout.rightMargin: 6
+                            Text {
+                                text: Cam.connected ? qsTr("Firmware %1").arg(Cam.firmware) : ""
+                                color: Theme.textFaint
+                                font.family: Theme.font
+                                font.pixelSize: Theme.small
+                                Layout.fillWidth: true
+                            }
+                            Text {
+                                text: qsTr("Firmware updates: OBSBOT Center")
+                                color: Theme.textFaint
+                                font.family: Theme.font
+                                font.pixelSize: Theme.small
+                                HoverHandler { id: fwHover }
+                                Tip { visible: fwHover.hovered; text: qsTr("The OBSBOT SDK can't update the camera's firmware. Use OBSBOT Center on Windows or macOS.") }
+                            }
                         }
                     }
                 }

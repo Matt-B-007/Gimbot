@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import QtQuick
 import QtQuick.Layouts
+import Gimbot
 
 // A rounded surface with an optional title row, an optional "More" section
 // that expands in place, and an optional note that explains why controls are
@@ -18,7 +19,7 @@ Rectangle {
     // it is open; leave it empty for no "More" section.
     property string moreKey: ""
     property string moreLabel: qsTr("More")
-    readonly property bool expanded: moreKey.length > 0 && cam.values[moreKey] === true
+    readonly property bool expanded: moreKey.length > 0 && Cam.values[moreKey] === true
 
     // Shown above the content when set, e.g. "The camera is asleep".
     property string note: ""
@@ -139,7 +140,7 @@ Rectangle {
                 border.color: Theme.accent
             }
             Accessible.name: root.expanded ? qsTr("Show fewer %1 settings").arg(root.title) : qsTr("Show more %1 settings").arg(root.title)
-            onClicked: cam.set(root.moreKey, !root.expanded)
+            onClicked: Cam.set(root.moreKey, !root.expanded)
             RowLayout {
                 anchors.centerIn: parent
                 spacing: 6

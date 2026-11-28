@@ -10,15 +10,27 @@
 #include <QDBusContext>
 #include <QObject>
 #include <QStringList>
+#include <QtQml/qqmlregistration.h>
 
 class Controller;
 class Updater;
 class QMenu;
 class QSystemTrayIcon;
 
+class QQmlEngine;
+class QJSEngine;
+
 class Platform : public QObject
 {
     Q_OBJECT
+    // QML sees the app's single instance as `Platform` (see qmlsingletons.cpp).
+    QML_NAMED_ELEMENT(Platform)
+    QML_SINGLETON
+
+public:
+    static Platform *create(QQmlEngine *, QJSEngine *);
+
+private:
     Q_PROPERTY(QString version READ version CONSTANT)
     Q_PROPERTY(QString sdkVersion READ sdkVersion CONSTANT)
     Q_PROPERTY(QString qtVersion READ qtVersion CONSTANT)
@@ -27,6 +39,7 @@ class Platform : public QObject
     // Plasma's "Animation speed" set to instant (reduced motion).
     Q_PROPERTY(bool reduceMotion READ reduceMotion CONSTANT)
     Q_PROPERTY(bool trayAvailable READ trayAvailable NOTIFY trayChanged)
+    Q_PROPERTY(bool startHidden READ startHidden CONSTANT) // started with --hidden
     Q_PROPERTY(QString trayState READ trayState NOTIFY trayChanged)
     Q_PROPERTY(bool issuesConfigured READ issuesConfigured CONSTANT)
     Q_PROPERTY(QString lastReport READ lastReport NOTIFY reportSaved)
@@ -50,6 +63,8 @@ public:
     QString system() const;
     bool kdeIntegration() const;
     bool trayAvailable() const { return m_trayAvailable; }
+    bool startHidden() const { return m_startHidden; }
+    void setStartHidden(bool on) { m_startHidden = on; }
     bool reduceMotion() const;
     // For `gimbot --report` without a running copy: use the log file, which
     // has the earlier sessions, instead of this run's lines.
@@ -132,6 +147,7 @@ private:
     bool m_problem = false; // the camera reported an error in the last minute
     QString m_trayState;
     QString m_lastReport;
+    bool m_startHidden = false;
     bool m_reportFromFile = false;
     QString m_newSdkPath, m_newSdkVersion;
 };

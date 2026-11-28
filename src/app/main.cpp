@@ -4,6 +4,7 @@
 #include "crashlog.hpp"
 #include "logger.hpp"
 #include "platform.hpp"
+#include "qmlsingletons.hpp"
 #include "selftest.hpp"
 #include "updater.hpp"
 
@@ -247,10 +248,9 @@ int main(int argc, char *argv[])
     }
 
     QQmlApplicationEngine engine;
-    engine.rootContext()->setContextProperty("cam", &cam);
-    engine.rootContext()->setContextProperty("platform", &platform);
-    engine.rootContext()->setContextProperty("updater", &updater);
-    engine.rootContext()->setContextProperty("startHidden", parser.isSet(hidden));
+    // QML reaches these as the singletons Cam, Platform and Updater.
+    platform.setStartHidden(parser.isSet(hidden));
+    qmlsingletons::set(&cam, &platform, &updater);
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); },
         Qt::QueuedConnection);
@@ -284,6 +284,14 @@ int main(int argc, char *argv[])
                                    "readme-light",
                                    "studio",
                                    "more",
+                                   "zone",
+                                   "zone-light",
+                                   "asleep",
+                                   "asleep-light",
+                                   "previewoff",
+                                   "busy",
+                                   "busy-light",
+                                   "small-aim",
                                    "settings",
                                    "settings:image",
                                    "settings:motion",

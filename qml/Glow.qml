@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+pragma ComponentBehavior: Bound
 import QtQuick
 
 // A soft accent glow (about 0 0 12px at 35%) behind one element: the single

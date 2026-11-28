@@ -17,7 +17,7 @@ ColumnLayout {
     signal moved(real value)
 
     spacing: 8
-    opacity: dim ? 0.45 : 1
+    opacity: dim || !enabled ? 0.45 : 1
     Behavior on opacity { NumberAnimation { duration: Theme.fast } }
 
     RowLayout {

@@ -32,6 +32,7 @@ Button {
     Accessible.name: text.length > 0 ? text : tip
     Accessible.description: tip
     scale: down ? 0.97 : 1
+    opacity: enabled ? 1 : 0.55 // every kind of button looks switched off when it is
     Behavior on scale { NumberAnimation { duration: Theme.fast } }
 
     contentItem: RowLayout {

@@ -379,16 +379,13 @@ void Platform::updateTrayState()
 
 void Platform::rebuildMenu()
 {
+    // Order: the camera's two switches first, then where to look, then the
+    // app itself. A native menu, so it follows the desktop's own style.
     m_menu->clear();
-    m_menu->addAction(QIcon::fromTheme("gimbot"), tr("Open Gimbot"), this, &Platform::showRequested);
-    m_menu->addSeparator();
+    const auto v = m_cam->values();
     if (!m_cam->connected()) {
         m_menu->addAction(tr("No camera connected"))->setEnabled(false);
     } else {
-        const auto v = m_cam->values();
-        const bool asleep = v.value("asleep").toBool();
-        m_menu->addAction(asleep ? tr("Wake camera") : tr("Sleep camera"), this,
-                          [this, asleep] { m_cam->set("asleep", !asleep); });
         const int mode = v.value("mode").toInt();
         auto *onOff = m_menu->addAction(tr("Tracking"), m_cam, &Controller::toggleTracking);
         onOff->setCheckable(true);
@@ -405,6 +402,11 @@ void Platform::rebuildMenu()
             a->setChecked(shown == m.second);
             group->addAction(a);
         }
+        const bool asleep = v.value("asleep").toBool();
+        auto *sleep = m_menu->addAction(tr("Camera asleep"), this, [this, asleep] { m_cam->set("asleep", !asleep); });
+        sleep->setCheckable(true);
+        sleep->setChecked(asleep);
+        m_menu->addSeparator();
         const auto presets = m_cam->presets();
         if (!presets.isEmpty()) {
             auto *pm = m_menu->addMenu(tr("Presets"));
@@ -417,6 +419,13 @@ void Platform::rebuildMenu()
         m_menu->addAction(tr("Recenter"), m_cam, &Controller::recenter);
     }
     m_menu->addSeparator();
+    const bool autostart = v.value("autostart").toBool();
+    auto *login = m_menu->addAction(tr("Start with my computer"), this,
+                                    [this, autostart] { m_cam->set("autostart", !autostart); });
+    login->setCheckable(true);
+    login->setChecked(autostart);
+    m_menu->addSeparator();
+    m_menu->addAction(QIcon::fromTheme("gimbot"), tr("Open Gimbot"), this, &Platform::showRequested);
     m_menu->addAction(tr("Settings…"), this, [this] {
         emit showRequested();
         emit pageRequested("settings");

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "selftest.hpp"
 
+#include "qmlsingletons.hpp"
+
 #include "commands.hpp"
 #include "controller.hpp"
 #include "crashlog.hpp"
@@ -74,10 +76,8 @@ void checkInterface()
     Updater updater(QStringLiteral(GIMBOT_REPO), QStringLiteral(GIMBOT_VERSION));
     Platform platform(&cam, &updater, QStringLiteral(GIMBOT_REPO));
     QQmlApplicationEngine engine;
-    engine.rootContext()->setContextProperty("cam", &cam);
-    engine.rootContext()->setContextProperty("platform", &platform);
-    engine.rootContext()->setContextProperty("updater", &updater);
-    engine.rootContext()->setContextProperty("startHidden", true);
+    platform.setStartHidden(true);
+    qmlsingletons::set(&cam, &platform, &updater);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     engine.loadFromModule("Gimbot", "Main");
 #else

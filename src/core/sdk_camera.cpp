@@ -53,6 +53,11 @@ Status convert(const Device::CameraStatus &cs)
     s.voiceMask = t.voice_ctrl;
     s.audioAutoGain = t.audio_auto_gain != 0;
     s.bootMode = t.boot_mode <= 5 ? t.boot_mode : 0;
+    // The SDK reports the status light's brightness but has no call to set it.
+    s.ledLevel = t.led_brightness_level <= 3 ? t.led_brightness_level : -1;
+    s.hasSleepPicture = (t.sleep_bg_type & 0x0f) != 0;
+    s.sleepPicture = std::clamp<int>(t.bg_img_idx, 0, 2);
+    s.sleepPictureMirrored = t.bg_img_mirror != 0;
     return s;
 }
 
@@ -400,6 +405,9 @@ public:
 
     // ---- device
     bool setGuideLight(bool on) override { return ok(dev_->cameraSetLedCtrlU(on)); }
+    // cameraSetResourceActionU: action 0 selects a sleep picture, 2 mirrors it.
+    bool setSleepPicture(int index) override { return ok(dev_->cameraSetResourceActionU(0, std::clamp(index, 0, 2))); }
+    bool setSleepPictureMirrored(bool on) override { return ok(dev_->cameraSetResourceActionU(2, on ? 1 : 0)); }
     bool factoryReset() override { return ok(dev_->cameraSetRestoreFactorySettingsR()); }
 
 private:

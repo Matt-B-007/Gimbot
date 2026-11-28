@@ -2,19 +2,20 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Gimbot
 
 // Remove Gimbot, optionally with its settings, logs and saved SDK.
 Sheet {
     id: root
-    title: updater.installState === "running" && updater.installAction === "uninstall" ? qsTr("Uninstalling…")
-         : updater.installState === "done" && updater.installAction === "uninstall" ? qsTr("Gimbot is uninstalled")
+    title: Updater.installState === "running" && Updater.installAction === "uninstall" ? qsTr("Uninstalling…")
+         : Updater.installState === "done" && Updater.installAction === "uninstall" ? qsTr("Gimbot is uninstalled")
          : qsTr("Uninstall Gimbot?")
     iconName: "alert"
     maxWidth: 480
     closePolicy: busy ? Popup.NoAutoClose : Popup.CloseOnEscape | Popup.CloseOnPressOutside
-    readonly property bool busy: updater.installState === "running" && updater.installAction === "uninstall"
-    readonly property bool finished: updater.installState === "done" && updater.installAction === "uninstall"
-    readonly property bool failed: updater.installState === "failed" && updater.installAction === "uninstall"
+    readonly property bool busy: Updater.installState === "running" && Updater.installAction === "uninstall"
+    readonly property bool finished: Updater.installState === "done" && Updater.installAction === "uninstall"
+    readonly property bool failed: Updater.installState === "failed" && Updater.installAction === "uninstall"
 
     Text {
         Layout.fillWidth: true
@@ -37,7 +38,7 @@ Sheet {
     }
     Text {
         Layout.fillWidth: true
-        visible: !updater.canInstall && !root.busy && !root.finished
+        visible: !Updater.canInstall && !root.busy && !root.finished
         wrapMode: Text.WordWrap
         color: Theme.warning
         font.family: Theme.font
@@ -48,7 +49,7 @@ Sheet {
         visible: root.busy
         Layout.fillWidth: true
         from: 0; to: 100
-        value: updater.installProgress
+        value: Updater.installProgress
     }
     Text {
         Layout.fillWidth: true
@@ -57,14 +58,14 @@ Sheet {
         color: root.failed ? Theme.danger : Theme.textMuted
         font.family: Theme.font
         font.pixelSize: Theme.fontSize - 1
-        text: root.failed ? updater.installError : root.finished ? qsTr("Gimbot will close now. Thanks for trying it.") : updater.installStatus
+        text: root.failed ? Updater.installError : root.finished ? qsTr("Gimbot will close now. Thanks for trying it.") : Updater.installStatus
     }
 
     buttons: [
         Item { Layout.fillWidth: true },
         Btn { text: qsTr("Cancel"); variant: "ghost"; visible: !root.busy && !root.finished; onClicked: root.close() },
-        Btn { text: qsTr("Uninstall"); variant: "danger"; visible: !root.busy && !root.finished; enabled: updater.canInstall
-              onClicked: updater.uninstall(purge.checked) },
+        Btn { text: qsTr("Uninstall"); variant: "danger"; visible: !root.busy && !root.finished; enabled: Updater.canInstall
+              onClicked: Updater.uninstall(purge.checked) },
         Btn { text: qsTr("Close Gimbot"); variant: "primary"; visible: root.finished; onClicked: Qt.quit() }
     ]
 }

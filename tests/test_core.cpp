@@ -13,6 +13,8 @@
 
 #include <QtTest>
 
+#include <cmath>
+
 class CoreTest : public QObject
 {
     Q_OBJECT
@@ -26,6 +28,62 @@ class CoreTest : public QObject
     }
 
 private slots:
+    // Picture <-> angles: the centre is straight ahead, the edges match the
+    // field of view, zoom narrows it, and the two directions undo each other.
+    void pictureAngles()
+    {
+        using t2::view::Offset;
+        auto o = t2::view::offsetFromPicture(0.5, 0.5, 0, 0);
+        QVERIFY(qAbs(o.rightDeg) < 1e-9 && qAbs(o.upDeg) < 1e-9);
+        // 86 degree diagonal, 16:9, no zoom: half the width is 39.1 degrees.
+        const auto edge = t2::view::offsetFromPicture(1.0, 0.5, 0, 0);
+        QVERIFY2(qAbs(edge.rightDeg - 39.1) < 0.1, qPrintable(QString::number(edge.rightDeg)));
+        const auto top = t2::view::offsetFromPicture(0.5, 0.0, 0, 0);
+        QVERIFY2(top.upDeg > 23.5 && top.upDeg < 25, qPrintable(QString::number(top.upDeg)));
+        // 4x zoom narrows it.
+        const auto zoomed = t2::view::offsetFromPicture(1.0, 0.5, 0, 100);
+        QVERIFY(zoomed.rightDeg < edge.rightDeg && zoomed.rightDeg > 0);
+        // A camera whose zoom tops out at 2x narrows half as much at 100%.
+        const auto twice = t2::view::offsetFromPicture(1.0, 0.5, 0, 100, 2.0);
+        QVERIFY(twice.rightDeg > zoomed.rightDeg && twice.rightDeg < edge.rightDeg);
+        // A narrower field of view (65) is narrower too.
+        QVERIFY(t2::view::offsetFromPicture(1.0, 0.5, 2, 0).rightDeg < 39.1);
+        // Round trip, including points outside the picture.
+        for (double x : {-0.4, 0.0, 0.2, 0.5, 0.9, 1.3}) {
+            for (double y : {-0.2, 0.1, 0.5, 1.0, 1.4}) {
+                for (int zoom : {0, 37, 100}) {
+                    const auto off = t2::view::offsetFromPicture(x, y, 1, zoom);
+                    double bx = 0, by = 0;
+                    t2::view::pictureFromOffset(off, 1, zoom, bx, by);
+                    QVERIFY2(qAbs(bx - x) < 1e-9 && qAbs(by - y) < 1e-9,
+                             qPrintable(QString("%1,%2 zoom %3 -> %4,%5").arg(x).arg(y).arg(zoom).arg(bx).arg(by)));
+                }
+            }
+        }
+    }
+
+    // The circle aim pad: still in the middle, faster further out, full speed
+    // at and past the edge, always in the direction dragged.
+    void aimPadSpeed()
+    {
+        auto s = t2::view::padSpeed(2, 1, 60); // inside the dead zone
+        QCOMPARE(s.up, 0.0);
+        QCOMPARE(s.right, 0.0);
+        s = t2::view::padSpeed(0, -60, 60); // straight up, at the edge
+        QVERIFY(qAbs(s.up - 1) < 1e-9 && qAbs(s.right) < 1e-9);
+        s = t2::view::padSpeed(0, 200, 60); // far past the bottom edge
+        QVERIFY(qAbs(s.up + 1) < 1e-9);
+        const auto half = t2::view::padSpeed(30, 0, 60);
+        const auto most = t2::view::padSpeed(50, 0, 60);
+        QVERIFY(half.right > 0 && half.right < most.right && most.right < 1);
+        QVERIFY(half.right < 0.5); // eased: half way is less than half speed
+        // Diagonal: equal parts up and right, never more than full speed.
+        s = t2::view::padSpeed(100, -100, 60);
+        QVERIFY(qAbs(s.up - s.right) < 1e-9);
+        QVERIFY(qAbs(std::hypot(s.up, s.right) - 1) < 1e-9);
+        QCOMPARE(t2::view::padSpeed(10, 10, 0).up, 0.0); // no size, no movement
+    }
+
     void trackingAndZoom()
     {
         auto cam = t2::openFakeCamera();

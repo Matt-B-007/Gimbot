@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Gimbot
 
 // Gathers details for a bug report. Nothing leaves the computer unless the
 // user saves or copies it, or opens a GitHub issue (summary and header only,
@@ -15,7 +16,7 @@ Sheet {
     property bool warnOnOpen: false // screenshots
     function showGithubWarning() { warnOnOpen = true; githubWarning.visible = true }
 
-    onOpened: { summary.text = ""; what.text = ""; githubWarning.visible = warnOnOpen; warnOnOpen = false; details.text = platform.diagnostics(serialBox.checked) }
+    onOpened: { summary.text = ""; what.text = ""; githubWarning.visible = warnOnOpen; warnOnOpen = false; details.text = Platform.diagnostics(serialBox.checked) }
 
     Field { id: summary; Layout.fillWidth: true; placeholderText: qsTr("Short summary, e.g. “Zoom slider does nothing”") }
 
@@ -54,7 +55,7 @@ Sheet {
             checked: false
             font.family: Theme.font
             font.pixelSize: Theme.small
-            onToggled: details.text = platform.diagnostics(checked)
+            onToggled: details.text = Platform.diagnostics(checked)
             contentItem: Text { leftPadding: serialBox.indicator.width + 6; text: serialBox.text; font: serialBox.font; color: Theme.textMuted; verticalAlignment: Text.AlignVCenter }
         }
     }
@@ -80,7 +81,7 @@ Sheet {
     }
 
     Text {
-        visible: !platform.issuesConfigured
+        visible: !Platform.issuesConfigured
         Layout.fillWidth: true
         wrapMode: Text.WordWrap
         text: qsTr("This build has no project page set, so copy the report and send it to whoever gave you Gimbot.")
@@ -106,7 +107,7 @@ Sheet {
             Text {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
-                text: platform.repoPublic
+                text: Platform.repoPublic
                       ? qsTr("This creates a PUBLIC issue that anyone can read.")
                       : qsTr("This creates an issue that only the owner of the repository can see.")
                 color: Theme.text
@@ -131,9 +132,9 @@ Sheet {
                     iconName: "external"
                     compact: true
                     onClicked: {
-                        if (platform.openIssue(summary.text, what.text, serialBox.checked)) {
-                            root.done(qsTr("Report saved. Attach %1 to the issue.").arg(platform.lastReport.split("/").pop()))
-                            platform.showSavedReport()
+                        if (Platform.openIssue(summary.text, what.text, serialBox.checked)) {
+                            root.done(qsTr("Report saved. Attach %1 to the issue.").arg(Platform.lastReport.split("/").pop()))
+                            Platform.showSavedReport()
                             root.close()
                         }
                     }
@@ -143,9 +144,9 @@ Sheet {
     }
 
     buttons: [
-        Btn { text: qsTr("Open log folder"); iconName: "folder"; variant: "ghost"; onClicked: platform.openLogFolder() },
+        Btn { text: qsTr("Open log folder"); iconName: "folder"; variant: "ghost"; onClicked: Platform.openLogFolder() },
         Btn {
-            visible: platform.issuesConfigured
+            visible: Platform.issuesConfigured
             text: qsTr("Open on GitHub…")
             iconName: "external"
             variant: "ghost"
@@ -156,7 +157,7 @@ Sheet {
             text: qsTr("Copy report")
             iconName: "copy"
             onClicked: {
-                platform.copyToClipboard(platform.reportText(summary.text, what.text, serialBox.checked))
+                Platform.copyToClipboard(Platform.reportText(summary.text, what.text, serialBox.checked))
                 root.done(qsTr("Report copied"))
             }
         },
@@ -166,10 +167,10 @@ Sheet {
             variant: "primary"
             glow: true // the screen's one main action
             onClicked: {
-                const path = platform.saveReport(summary.text, what.text, serialBox.checked)
+                const path = Platform.saveReport(summary.text, what.text, serialBox.checked)
                 if (path.length > 0) {
                     root.done(qsTr("Report saved to %1").arg(path.replace(/^.*\/(Downloads|[^/]+)\//, "$1/")))
-                    platform.showSavedReport()
+                    Platform.showSavedReport()
                     root.close()
                 }
             }

@@ -14,16 +14,30 @@
 #include <QElapsedTimer>
 #include <QHash>
 #include <QObject>
+#include <QPointF>
 #include <QSettings>
 #include <QTimer>
+#include <QUrl>
 #include <QVariant>
+#include <QtQml/qqmlregistration.h>
 
 #include <functional>
 #include <memory>
 
+class QQmlEngine;
+class QJSEngine;
+
 class Controller : public QObject
 {
     Q_OBJECT
+    // QML sees the app's single instance as `Cam` (see qmlsingletons.cpp).
+    QML_NAMED_ELEMENT(Cam)
+    QML_SINGLETON
+
+public:
+    static Controller *create(QQmlEngine *, QJSEngine *);
+
+private:
     Q_PROPERTY(bool connected READ connected NOTIFY connectedChanged)
     Q_PROPERTY(bool usbAvailable READ usbAvailable NOTIFY deviceChanged)
     Q_PROPERTY(bool simulated READ simulated CONSTANT)
@@ -86,6 +100,26 @@ public:
     Q_INVOKABLE void recenter();
     Q_INVOKABLE void aimAt(double x, double y);            // point in the preview, 0..1
     Q_INVOKABLE void aimAbsolute(double pan, double tilt); // degrees, screen frame
+    // Between the picture (x, y 0..1, may be outside) and the camera's own
+    // angles (SDK frame, as the zone uses), from where it points now.
+    Q_INVOKABLE QVariantMap anglesFromPicture(double x, double y) const; // {yaw, pitch}
+    // Sets the tracking area from a box drawn on the picture (0..1, any two
+    // opposite corners). Edges past the camera's reach are held at its limits.
+    // The four flags say which of the box's sides to use; the others stay
+    // as they are (a side outside the picture can't be read back exactly).
+    Q_INVOKABLE void setZoneFromPicture(double x1, double y1, double x2, double y2, bool left = true, bool top = true,
+                                        bool right = true, bool bottom = true);
+    // Sets all four edges (camera angles), in an order that never gives the
+    // camera an inside-out area on the way.
+    Q_INVOKABLE void setZoneEdges(double yawMin, double yawMax, double pitchMin, double pitchMax);
+    Q_INVOKABLE QPointF pictureFromAngles(double yaw, double pitch) const;
+    // SDK yaw <-> degrees towards the picture's right (mirroring included).
+    Q_INVOKABLE double screenFromYaw(double yaw) const;
+    Q_INVOKABLE double yawFromScreen(double right) const;
+    // The circle aim pad: knob offset in pixels -> speeds {up, right}, -1..1.
+    Q_INVOKABLE QVariantMap padSpeed(double dx, double dy, double radius) const;
+    // Start moving at the pad's speeds (screen frame), or stop at 0, 0.
+    Q_INVOKABLE void movePad(double dx, double dy, double radius);
     Q_INVOKABLE void zoomBy(int delta);
 
     // Tracking on/off. Turning it on returns to the last mode used.
@@ -202,6 +236,7 @@ private:
     QHash<QString, Setting> m_table;
     QVariantMap m_values;
     QVariantMap m_ranges;
+    double zoomMaxNow() const;
     QHash<QString, QElapsedTimer> m_touched;
 
     std::vector<t2::Preset> m_rawPresets;

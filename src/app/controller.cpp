@@ -16,6 +16,7 @@
 #include <QUrl>
 
 #include <algorithm>
+#include <cmath>
 
 using t2::Camera;
 
@@ -85,7 +86,11 @@ QVariantMap statusToMap(const t2::Status &s)
                   {"antiFlicker", s.antiFlicker},
                   {"micDuringSleep", s.micDuringSleep},
                   {"voiceLanguage", s.voiceLanguage},
-                  {"audioAutoGain", s.audioAutoGain}};
+                  {"audioAutoGain", s.audioAutoGain},
+                  {"ledLevel", s.ledLevel},
+                  {"hasSleepPicture", s.hasSleepPicture},
+                  {"sleepPicture", s.sleepPicture},
+                  {"sleepPictureMirrored", s.sleepPictureMirrored}};
     for (int i = 0; i < static_cast<int>(t2::Voice::Count); ++i)
         m[QStringLiteral("voice%1").arg(i)] = (s.voiceMask & (1 << i)) != 0;
     if (s.modeSwitching) {
@@ -192,6 +197,14 @@ void Controller::defineSettings()
         [=](Camera &c, V v) { return c.setFaceExposure(b(v, "faceExposure")); });
     def("antiFlicker", Kind::Status, 3, tr("anti-flicker"),
         [=](Camera &c, V v) { return c.setAntiFlicker(i(v, "antiFlicker")); });
+    // Status light brightness, 0 off or 1..3 (-1 = the camera didn't say).
+    // Read-only: the OBSBOT SDK reports it but has no call to change it.
+    def("ledLevel", Kind::Status, -1, tr("status light"));
+    def("hasSleepPicture", Kind::Status, false, tr("sleep picture"));
+    def("sleepPicture", Kind::Status, 0, tr("sleep picture"),
+        [=](Camera &c, V v) { return c.setSleepPicture(i(v, "sleepPicture")); });
+    def("sleepPictureMirrored", Kind::Status, false, tr("sleep picture mirroring"),
+        [=](Camera &c, V v) { return c.setSleepPictureMirrored(b(v, "sleepPictureMirrored")); });
     def("micDuringSleep", Kind::Status, false, tr("microphone during sleep"),
         [=](Camera &c, V v) { return c.setMicDuringSleep(b(v, "micDuringSleep")); });
     def("voiceLanguage", Kind::Status, 1, tr("voice language"),
@@ -707,6 +720,92 @@ void Controller::aimAbsolute(double pan, double tilt)
     emit positionChanged();
     const float pitch = float(m_pitch), yaw = float(m_yaw), speed = glide();
     call("move", tr("aiming"), [pitch, yaw, speed](Camera &c) { return c.moveTo(pitch, yaw, speed); });
+}
+
+QVariantMap Controller::anglesFromPicture(double x, double y) const
+{
+    const auto o = orientation();
+    const auto off = t2::view::offsetFromPicture(x, y, m_values["fov"].toInt(), m_values["zoom"].toInt(), zoomMaxNow());
+    return {{"yaw", m_yaw + t2::axis::yawFromScreen(off.rightDeg, o)},
+            {"pitch", m_pitch + t2::axis::pitchFromScreen(off.upDeg, o)}};
+}
+
+void Controller::setZoneFromPicture(double x1, double y1, double x2, double y2, bool left, bool top, bool right,
+                                    bool bottom)
+{
+    const auto a = anglesFromPicture(std::min(x1, x2), std::min(y1, y2)); // top left
+    const auto c = anglesFromPicture(std::max(x1, x2), std::max(y1, y2)); // bottom right
+    const double leftYaw = a["yaw"].toDouble(), rightYaw = c["yaw"].toDouble();
+    const double topPitch = a["pitch"].toDouble(), bottomPitch = c["pitch"].toDouble();
+    const double yawMin = m_values["zoneYawMin"].toDouble(), yawMax = m_values["zoneYawMax"].toDouble();
+    const double pitchMin = m_values["zonePitchMin"].toDouble(), pitchMax = m_values["zonePitchMax"].toDouble();
+    // Which picture side is the lower angle depends on mirroring and flips.
+    const bool leftIsMin = leftYaw <= rightYaw, topIsMin = topPitch <= bottomPitch;
+    setZoneEdges(leftIsMin ? (left ? leftYaw : yawMin) : (right ? rightYaw : yawMin),
+                 leftIsMin ? (right ? rightYaw : yawMax) : (left ? leftYaw : yawMax),
+                 topIsMin ? (top ? topPitch : pitchMin) : (bottom ? bottomPitch : pitchMin),
+                 topIsMin ? (bottom ? bottomPitch : pitchMax) : (top ? topPitch : pitchMax));
+}
+
+void Controller::setZoneEdges(double yawMin, double yawMax, double pitchMin, double pitchMax)
+{
+    const t2::Zone reach; // the defaults are the camera's whole range
+    const auto held = [](double v, double lo, double hi) { return std::round(std::clamp(v, lo, hi)); };
+    const auto apply = [this](const char *minKey, const char *maxKey, double lo, double hi) {
+        if (lo > hi) std::swap(lo, hi);
+        // Moving the whole range up: raise the top first, so min never passes max.
+        if (lo > m_values[maxKey].toDouble()) {
+            set(maxKey, hi);
+            set(minKey, lo);
+        } else {
+            set(minKey, lo);
+            set(maxKey, hi);
+        }
+    };
+    apply("zoneYawMin", "zoneYawMax", held(yawMin, reach.yawMin, reach.yawMax),
+          held(yawMax, reach.yawMin, reach.yawMax));
+    apply("zonePitchMin", "zonePitchMax", held(pitchMin, reach.pitchMin, reach.pitchMax),
+          held(pitchMax, reach.pitchMin, reach.pitchMax));
+}
+
+double Controller::zoomMaxNow() const
+{
+    const double m = m_ranges.value("zoomMax").toDouble();
+    return m > 1 ? m : 4.0;
+}
+
+QPointF Controller::pictureFromAngles(double yaw, double pitch) const
+{
+    const auto o = orientation();
+    t2::view::Offset off{t2::axis::screenFromYaw(yaw - m_yaw, o), t2::axis::screenFromPitch(pitch - m_pitch, o)};
+    double x = 0.5, y = 0.5;
+    t2::view::pictureFromOffset(off, m_values["fov"].toInt(), m_values["zoom"].toInt(), x, y, zoomMaxNow());
+    return {x, y};
+}
+
+double Controller::screenFromYaw(double yaw) const
+{
+    return t2::axis::screenFromYaw(yaw, orientation());
+}
+
+double Controller::yawFromScreen(double right) const
+{
+    return t2::axis::yawFromScreen(right, orientation());
+}
+
+QVariantMap Controller::padSpeed(double dx, double dy, double radius) const
+{
+    const auto s = t2::view::padSpeed(dx, dy, radius);
+    return {{"up", s.up}, {"right", s.right}};
+}
+
+void Controller::movePad(double dx, double dy, double radius)
+{
+    const auto s = t2::view::padSpeed(dx, dy, radius);
+    if (s.up == 0 && s.right == 0)
+        stopMove();
+    else
+        move(s.up, s.right);
 }
 
 void Controller::zoomBy(int delta)

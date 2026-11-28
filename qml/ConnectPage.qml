@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
+import Gimbot
 
 // Shown while no camera is connected. The app switches to the camera on its
 // own as soon as one is plugged in.
@@ -9,19 +11,6 @@ Rectangle {
     color: Theme.bg
     signal openSettings()
     signal openReport()
-
-    RowLayout {
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.margins: 20
-        anchors.topMargin: 14
-        spacing: 10
-        Image { source: "icons/gimbot.svg"; sourceSize: Qt.size(34, 34) }
-        Text { text: "Gimbot"; color: Theme.text; font.family: Theme.font; font.pixelSize: 17; font.weight: Font.Bold }
-        Item { Layout.fillWidth: true }
-        IconBtn { iconName: "gear"; tip: qsTr("Settings"); onClicked: root.openSettings() }
-    }
 
     ColumnLayout {
         anchors.centerIn: parent
@@ -35,17 +24,18 @@ Rectangle {
             Repeater {
                 model: 2
                 Rectangle {
+                    id: ring
                     required property int index
                     anchors.centerIn: parent
                     width: 132; height: 132; radius: 66
                     color: "transparent"
                     border.width: 2
                     border.color: Theme.accent
-                    visible: cam.usbAvailable
+                    visible: Cam.usbAvailable
                     SequentialAnimation on scale {
                         loops: Animation.Infinite
                         running: root.visible
-                        PauseAnimation { duration: index * 900 }
+                        PauseAnimation { duration: ring.index * 900 }
                         ParallelAnimation {
                             NumberAnimation { from: 0.55; to: 1.15; duration: 1800; easing.type: Easing.OutCubic }
                         }
@@ -53,7 +43,7 @@ Rectangle {
                     SequentialAnimation on opacity {
                         loops: Animation.Infinite
                         running: root.visible
-                        PauseAnimation { duration: index * 900 }
+                        PauseAnimation { duration: ring.index * 900 }
                         NumberAnimation { from: 0.8; to: 0; duration: 1800; easing.type: Easing.OutCubic }
                     }
                 }
@@ -63,7 +53,7 @@ Rectangle {
                 width: 76; height: 76; radius: 24
                 color: Theme.surface
                 border.color: Theme.border
-                Icon { anchors.centerIn: parent; name: cam.usbAvailable ? "camera" : "alert"; size: 34; stroke: 1.6; color: cam.usbAvailable ? Theme.accent : Theme.warning }
+                Icon { anchors.centerIn: parent; name: Cam.usbAvailable ? "camera" : "alert"; size: 34; stroke: 1.6; color: Cam.usbAvailable ? Theme.accent : Theme.warning }
             }
         }
 
@@ -73,7 +63,7 @@ Rectangle {
             Text {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
-                text: cam.usbAvailable ? qsTr("Plug in your OBSBOT camera") : qsTr("Can't look for cameras")
+                text: Cam.usbAvailable ? qsTr("Plug in your OBSBOT camera") : qsTr("Can't look for cameras")
                 color: Theme.text
                 font.family: Theme.font
                 font.pixelSize: 26
@@ -84,8 +74,8 @@ Rectangle {
             Text {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
-                text: cam.usbAvailable ? qsTr("Gimbot finds it on its own as soon as it's connected. No setup needed.")
-                    : platform.sdkVersion === "none" ? qsTr("This copy of Gimbot was built without the OBSBOT SDK, so it can only run the simulated camera (start it with --fake).")
+                text: Cam.usbAvailable ? qsTr("Gimbot finds it on its own as soon as it's connected. No setup needed.")
+                    : Platform.sdkVersion === "none" ? qsTr("This copy of Gimbot was built without the OBSBOT SDK, so it can only run the simulated camera (start it with --fake).")
                     : qsTr("This system has no USB device list (/sys/bus/usb/devices), so cameras can't be detected.")
                 color: Theme.textMuted
                 font.family: Theme.font

@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.21)
 project(gimbot VERSION 0.1.0 LANGUAGES CXX)
 # The full version, including any pre-release part. project() only accepts
 # numbers, so this is what the app, the installer and the package use.
-set(GIMBOT_VERSION "0.1.0-beta.15")
+set(GIMBOT_VERSION "0.1.0-beta.17")
 if(NOT GIMBOT_VERSION MATCHES "^${PROJECT_VERSION}(-[0-9A-Za-z.]+)?$")
     message(FATAL_ERROR "GIMBOT_VERSION (${GIMBOT_VERSION}) must start with the project version (${PROJECT_VERSION})")
 endif()
@@ -191,6 +191,7 @@ if(BUILD_GUI)
         src/app/platform.cpp src/app/platform.hpp
         src/app/trayicon.cpp src/app/trayicon.hpp
         src/app/redact.cpp src/app/redact.hpp
+        src/app/qmlsingletons.cpp src/app/qmlsingletons.hpp
         src/app/previewformat.cpp src/app/previewformat.hpp
         src/app/settingsstore.cpp src/app/settingsstore.hpp
         src/app/crashlog.cpp src/app/crashlog.hpp
@@ -216,7 +217,7 @@ if(BUILD_GUI)
             qml/AimCard.qml qml/TrackingCard.qml qml/ImageCard.qml qml/Banner.qml
             qml/CommandPalette.qml qml/ReportDialog.qml qml/AboutDialog.qml
             qml/NameDialog.qml qml/ConfirmDialog.qml qml/UpdateDialog.qml qml/Sheet.qml qml/Toasts.qml
-            qml/Icon.qml qml/Btn.qml qml/Brackets.qml qml/Glow.qml qml/IconBtn.qml qml/Segmented.qml qml/Toggle.qml
+            qml/NavRail.qml qml/SleepPicturePicker.qml qml/StatusLightCard.qml qml/AimPad.qml qml/ZoneOverlay.qml qml/ZoneRangeBar.qml qml/ZonePanel.qml qml/Icon.qml qml/IconShape.qml qml/Btn.qml qml/Brackets.qml qml/Glow.qml qml/IconBtn.qml qml/Segmented.qml qml/Toggle.qml
             qml/SliderRow.qml qml/Select.qml qml/Card.qml qml/SettingRow.qml qml/Field.qml
             qml/Kbd.qml qml/StyledMenu.qml qml/AbstractButtonLike.qml
             qml/Tip.qml qml/MenuEntry.qml qml/MenuLine.qml qml/StatusStrip.qml qml/Tour.qml
@@ -224,8 +225,10 @@ if(BUILD_GUI)
         RESOURCES
             qml/icons/gimbot.svg
             qml/fonts/Inter-Regular.ttf qml/fonts/Inter-Medium.ttf
-            qml/fonts/Inter-SemiBold.ttf qml/fonts/Inter-Bold.ttf)
+            qml/fonts/Inter-SemiBold.ttf qml/fonts/Inter-Bold.ttf qml/fonts/SpaceGrotesk-SemiBold.ttf)
 
+    # The QML type registrations include the singletons' headers by name.
+    target_include_directories(gimbot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/app)
     target_link_libraries(gimbot PRIVATE gimbotcore
         Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::DBus
         Qt6::Svg Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Multimedia)
@@ -263,7 +266,7 @@ if(BUILD_TESTING)
     add_executable(gimbot_tests tests/test_core.cpp src/app/updater.cpp src/app/previewformat.cpp
         src/app/settingsstore.cpp)
     target_include_directories(gimbot_tests PRIVATE src/app)
-    target_link_libraries(gimbot_tests PRIVATE gimbotcore Qt6::Core Qt6::Network Qt6::Test)
+    target_link_libraries(gimbot_tests PRIVATE gimbotcore Qt6::Core Qt6::Network Qt6::Qml Qt6::Test)
     target_compile_options(gimbot_tests PRIVATE ${GIMBOT_WARNINGS})
     add_test(NAME gimbot_tests COMMAND gimbot_tests)
     add_test(NAME web_addresses COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_urls.sh ${CMAKE_CURRENT_SOURCE_DIR})
@@ -271,7 +274,7 @@ if(BUILD_TESTING)
         add_executable(gimbot_controller_tests tests/test_controller.cpp
             src/app/controller.cpp src/app/worker.cpp src/app/logger.cpp src/app/settingsstore.cpp)
         target_include_directories(gimbot_controller_tests PRIVATE src/app)
-        target_link_libraries(gimbot_controller_tests PRIVATE gimbotcore Qt6::Core Qt6::Gui Qt6::Test)
+        target_link_libraries(gimbot_controller_tests PRIVATE gimbotcore Qt6::Core Qt6::Gui Qt6::Qml Qt6::Test)
         set_target_properties(gimbot_controller_tests PROPERTIES AUTOMOC ON)
         target_compile_options(gimbot_controller_tests PRIVATE ${GIMBOT_WARNINGS})
         add_test(NAME gimbot_controller_tests COMMAND gimbot_controller_tests)

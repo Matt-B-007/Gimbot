@@ -6,7 +6,7 @@ import QtQuick.Controls
 MenuItem {
     id: item
     implicitHeight: visible ? 34 : 0
-    implicitWidth: 240
+    implicitWidth: Math.max(220, contentItem.implicitWidth + leftPadding + rightPadding + 8)
     font.family: Theme.font
     font.pixelSize: Theme.fontSize
     contentItem: Text {

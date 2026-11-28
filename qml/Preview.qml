@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtMultimedia
 import QtQuick.Window
 import QtQml.Models
+import Gimbot
 
-// Live video with click-to-aim, drag-to-steer, scroll-to-zoom, the framing
+// Live video with double-click-to-aim, drag-to-steer, scroll-to-zoom, the framing
 // grid, the preview bar (quality, grid, preview on/off) and the floating
 // tracking-mode dock.
 Rectangle {
@@ -17,6 +19,7 @@ Rectangle {
     property real aimX: -1
     property real aimY: -1
     property bool clickedOnce: false // the hover hint stops once you've used the preview
+    property bool zoneEditing: false // the zone is drawn on the picture to edit
     readonly property size videoSize: videoRunning ? qcam.cameraFormat.resolution : Qt.size(0, 0)
     readonly property real videoFps: videoRunning ? qcam.cameraFormat.maxFrameRate : 0
 
@@ -24,24 +27,24 @@ Rectangle {
     // the camera offers, otherwise the sharpest smooth one for the preview's
     // size on screen. Debounced so resizing doesn't restart the video on
     // every pixel.
-    readonly property string choice: cam.values.previewChoice || ""
+    readonly property string choice: Cam.values.previewChoice || ""
     readonly property bool autoQuality: choice.length === 0
     // What the camera really offers, for the menu.
-    readonly property var formatChoices: root.device !== null ? platform.previewChoices(root.device) : []
+    readonly property var formatChoices: root.device !== null ? Platform.previewChoices(root.device) : []
     readonly property string currentLabel: videoRunning && videoSize.width > 0
-        ? platform.formatLabel(videoSize.width, videoSize.height, Math.round(videoFps)) : ""
+        ? Platform.formatLabel(videoSize.width, videoSize.height, Math.round(videoFps)) : ""
     readonly property int targetHeight: Math.round(height * Screen.devicePixelRatio)
     onTargetHeightChanged: formatTimer.restart()
     onDeviceChanged: formatTimer.restart()
     Connections {
-        target: cam
+        target: Cam
         function onValuesChanged() { if (root.choice !== root.appliedFor) formatTimer.restart() }
     }
     property var appliedDevice: null
     property string appliedFor: "-" // the choice last applied ("-": none yet)
     function chooseFormat() {
         if (root.device === null) return
-        const f = platform.previewFormat(root.device, root.targetHeight, root.choice)
+        const f = Platform.previewFormat(root.device, root.targetHeight, root.choice)
         if (f.resolution.width <= 0) return
         const cur = qcam.cameraFormat
         if (cur.resolution.width === f.resolution.width && cur.resolution.height === f.resolution.height
@@ -66,7 +69,7 @@ Rectangle {
     function retry() {
         root.error = ""
         qcam.active = false
-        qcam.active = Qt.binding(() => root.device !== null && cam.values.previewEnabled && !cam.values.asleep && root.windowVisible)
+        qcam.active = Qt.binding(() => root.device !== null && Cam.values.previewEnabled && !Cam.values.asleep && root.windowVisible)
     }
 
     function grabThumbnail(path, callback) {
@@ -86,7 +89,7 @@ Rectangle {
         camera: Camera {
             id: qcam
             cameraDevice: root.device !== null ? root.device : devices.defaultVideoInput
-            active: root.device !== null && cam.values.previewEnabled && !cam.values.asleep && root.windowVisible
+            active: root.device !== null && Cam.values.previewEnabled && !Cam.values.asleep && root.windowVisible
             onErrorOccurred: (code, message) => {
                 root.error = message.length > 0 ? message : qsTr("The camera couldn't start")
                 console.warn("Preview error:", message)
@@ -107,7 +110,7 @@ Rectangle {
     // "Plain background" or when animations are off.
     Canvas {
         anchors.fill: parent
-        visible: !root.videoRunning && !cam.values.plainBackground && !platform.reduceMotion
+        visible: !root.videoRunning && !Cam.values.plainBackground && !Platform.reduceMotion
         opacity: 0.045
         onWidthChanged: requestPaint()
         onHeightChanged: requestPaint()
@@ -122,62 +125,95 @@ Rectangle {
         }
     }
 
-    // Shown when there is no picture.
+    // Shown when there is no picture: what's going on, and what to do.
     ColumnLayout {
+        id: statePanel
+        z: 3 // above the picture's click area, so its buttons can be pressed
         anchors.centerIn: parent
-        width: Math.min(parent.width - 48, 420)
-        spacing: 10
-        visible: !root.videoRunning && !cam.values.asleep
-        Icon {
+        width: Math.min(parent.width - 48, 480)
+        spacing: 12
+        visible: !root.videoRunning && !Cam.values.asleep
+        readonly property bool busy: root.error.length > 0
+        readonly property bool off: !Cam.values.previewEnabled
+        Rectangle {
             Layout.alignment: Qt.AlignHCenter
-            name: root.error.length > 0 ? "alert" : !cam.values.previewEnabled ? "eye-off" : "camera"
-            color: "#6b7a8f"
-            size: 28
+            implicitWidth: 60
+            implicitHeight: 60
+            radius: 30
+            color: statePanel.busy ? Qt.rgba(0.984, 0.749, 0.141, 0.10) : "#1a212c"
+            border.color: statePanel.busy ? Qt.rgba(0.984, 0.749, 0.141, 0.45) : "#364459"
+            Icon {
+                anchors.centerIn: parent
+                name: statePanel.busy ? "alert" : statePanel.off ? "eye-off" : "camera"
+                color: statePanel.busy ? "#fbbf24" : "#9aa6b8"
+                size: 28
+                stroke: 1.8
+            }
         }
         Text {
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
-            color: "#d5dce6"
-            font.family: Theme.font
-            font.pixelSize: Theme.fontSize
-            font.weight: Font.Medium
-            text: root.error.length > 0 ? qsTr("Preview unavailable")
-                : !cam.values.previewEnabled ? qsTr("Preview is off")
-                : cam.simulated ? qsTr("Simulated camera, no video")
+            color: "#e8edf4"
+            font.family: Theme.displayFont
+            font.pixelSize: 22
+            text: statePanel.busy ? qsTr("Another app is using the picture")
+                : statePanel.off ? qsTr("Preview is off")
+                : Cam.simulated ? qsTr("Simulated camera, no video")
                 : root.device === null ? qsTr("Looking for the camera's video…")
                 : qsTr("Starting preview…")
         }
         Text {
             Layout.fillWidth: true
-            visible: root.error.length > 0 || !cam.values.previewEnabled || cam.simulated
+            visible: statePanel.busy || statePanel.off || Cam.simulated
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+            lineHeight: 1.15
+            color: "#9aa6b8"
+            font.family: Theme.font
+            font.pixelSize: Theme.fontSize
+            text: statePanel.busy
+                ? qsTr("A video call or recording app has the camera's video, so the preview can't show it here. Tracking, aiming, zoom and presets still work.")
+                : statePanel.off ? qsTr("The camera carries on as it was: tracking, aiming, zoom and presets all still work. With the preview off, Gimbot uses less power and leaves the video free for other apps.")
+                : qsTr("Every control works; settings are kept in memory.")
+        }
+        RowLayout {
+            Layout.alignment: Qt.AlignHCenter
+            Layout.topMargin: 4
+            spacing: 10
+            visible: statePanel.busy || statePanel.off
+            Btn {
+                variant: "primary"
+                glow: true
+                text: statePanel.busy ? qsTr("Try the preview again") : qsTr("Turn the preview on")
+                onClicked: {
+                    if (statePanel.off) { Cam.set("previewEnabled", true); return }
+                    root.retry()
+                }
+            }
+            Btn {
+                visible: statePanel.busy
+                variant: "ghost"
+                text: qsTr("Hide the preview")
+                onClicked: Cam.set("previewEnabled", false)
+            }
+        }
+        Text {
+            Layout.fillWidth: true
+            visible: statePanel.busy
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
             color: "#9aa6b8"
             font.family: Theme.font
-            font.pixelSize: Theme.small + 1
-            text: root.error.length > 0
-                ? qsTr("Another app such as Zoom or OBS may be using the camera. The controls still work.")
-                : !cam.values.previewEnabled ? qsTr("Turn it back on to see the camera here.")
-                : qsTr("Every control works; settings are kept in memory.")
-        }
-        Btn {
-            Layout.alignment: Qt.AlignHCenter
-            visible: root.error.length > 0 || !cam.values.previewEnabled
-            text: root.error.length > 0 ? qsTr("Try again") : qsTr("Turn preview on")
-            iconName: root.error.length > 0 ? "refresh" : "eye"
-            compact: true
-            onClicked: {
-                if (!cam.values.previewEnabled) { cam.set("previewEnabled", true); return }
-                root.retry()
-            }
+            font.pixelSize: Theme.small
+            text: qsTr("The preview comes back by itself when the other app lets go of the camera.")
         }
     }
 
     // Rule-of-thirds guide.
     Item {
         anchors.fill: parent
-        visible: cam.values.showGrid && !cam.values.asleep
+        visible: Cam.values.showGrid && !Cam.values.asleep
         Repeater {
             model: 2
             Rectangle { required property int index; x: root.width * (index + 1) / 3; width: 1; height: root.height; color: Qt.rgba(1, 1, 1, 0.07) }
@@ -188,12 +224,13 @@ Rectangle {
         }
     }
 
-    // Click to aim; press and drag to steer like a joystick (the further
+    // Double-click to aim; press and drag to steer like a joystick (the further
     // you drag, the faster it moves); scroll to zoom.
     MouseArea {
         id: pointer
         anchors.fill: parent
-        enabled: cam.connected && !cam.values.asleep
+        preventStealing: true // or the page's scrolling takes an up-and-down drag
+        enabled: Cam.connected && !Cam.values.asleep && !root.zoneEditing
         hoverEnabled: true
         cursorShape: !enabled ? Qt.ArrowCursor : steering ? Qt.SizeAllCursor : Qt.CrossCursor
         acceptedButtons: Qt.LeftButton
@@ -201,17 +238,20 @@ Rectangle {
         property real pressY: 0
         property bool steering: false
         readonly property real reach: Math.min(width, height) * 0.35 // drag this far for full speed
-        onPressed: (mouse) => { pressX = mouse.x; pressY = mouse.y; steering = false; root.clickedOnce = true }
+        onPressed: (mouse) => { pressX = mouse.x; pressY = mouse.y; steering = false }
         onPositionChanged: (mouse) => {
             if (!pressed) return
             const dx = mouse.x - pressX, dy = mouse.y - pressY
             if (!steering && Math.hypot(dx, dy) < 8) return
             steering = true
             const ease = (v) => Math.sign(v) * Math.min(1, Math.pow(Math.abs(v), 1.5)) // gentle near the start
-            cam.move(ease(-dy / reach), ease(dx / reach))
+            Cam.move(ease(-dy / reach), ease(dx / reach))
         }
-        onReleased: (mouse) => {
-            if (steering) { steering = false; cam.stopMove(); return }
+        onReleased: (mouse) => { if (steering) { steering = false; Cam.stopMove() } }
+        // Double-click to point the camera there (a single click is too easy
+        // to make by accident while reaching for something else).
+        onDoubleClicked: (mouse) => {
+            root.clickedOnce = true
             // Map to the picture itself, not the letterboxed area around it.
             const r = root.videoRunning ? output.contentRect : Qt.rect(0, 0, width, height)
             const x = (mouse.x - r.x) / r.width, y = (mouse.y - r.y) / r.height
@@ -220,10 +260,10 @@ Rectangle {
             root.aimY = mouse.y
             reticle.opacity = 1
             fade.restart()
-            cam.aimAt(x, y)
+            Cam.aimAt(x, y)
         }
-        onCanceled: if (steering) { steering = false; cam.stopMove() }
-        onWheel: (wheel) => cam.zoomBy(wheel.angleDelta.y > 0 ? 5 : -5)
+        onCanceled: if (steering) { steering = false; Cam.stopMove() }
+        onWheel: (wheel) => Cam.zoomBy(wheel.angleDelta.y > 0 ? 5 : -5)
     }
 
     // Drag-to-steer: a line from where you pressed to the pointer.
@@ -250,8 +290,11 @@ Rectangle {
     }
 
     Tip {
-        visible: !root.clickedOnce && pointer.containsMouse && !pointer.pressed && cam.connected && !cam.values.asleep && !bar.hovered
-        text: qsTr("Click to point the camera here · drag to steer · scroll to zoom")
+        visible: !root.clickedOnce && pointer.containsMouse && !pointer.pressed && Cam.connected && !Cam.values.asleep && !bar.hovered
+        // Inside the picture, bottom left: its usual place above would cover the top bar.
+        x: 16
+        y: root.height - height - 70
+        text: qsTr("Double-click to point the camera here · drag to steer · scroll to zoom")
     }
 
     Item {
@@ -267,6 +310,39 @@ Rectangle {
         Timer { id: fade; interval: 900; onTriggered: reticle.opacity = 0 }
     }
 
+    ZoneOverlay {
+        // Over the video itself, not the black bars beside a picture that
+        // isn't 16:9.
+        readonly property rect picture: root.videoRunning ? output.contentRect : Qt.rect(0, 0, root.width, root.height)
+        x: picture.x
+        y: picture.y
+        width: picture.width
+        height: picture.height
+        visible: root.zoneEditing && !Cam.values.asleep
+        z: 5
+    }
+    // While tracking, blue corner brackets frame the picture, matching the
+    // camera's status light.
+    Brackets {
+        anchors.fill: parent
+        anchors.margins: 10
+        arm: 26
+        thickness: 2.5
+        inset: 0
+        color: Theme.ledBlue
+        opacity: Cam.values.mode !== 0 && !Cam.trackingPaused && !Cam.values.asleep ? 0.9 : 0
+    }
+    Text { // the double-click hint, while there's room for it
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 18
+        visible: root.width > 900 && Cam.connected && !Cam.values.asleep && !pointer.steering && !root.clickedOnce
+        text: qsTr("Double-click to point the camera there")
+        color: "#9aa6b8"
+        font.family: Theme.font
+        font.pixelSize: Theme.small
+    }
+
     // Top row: tracking state on the left, the preview bar on the right.
     RowLayout {
         anchors.top: parent.top
@@ -274,13 +350,15 @@ Rectangle {
         anchors.right: parent.right
         anchors.margins: 14
         spacing: 8
-        visible: !cam.values.asleep
+        visible: !Cam.values.asleep
         Chip {
             showDot: true
-            dotColor: cam.values.mode !== 0 ? Theme.accent : cam.trackingPaused ? Theme.warning : "#6b7a8f"
-            text: cam.values.mode !== 0
-                  ? qsTr("Tracking: %1").arg(["", qsTr("Group"), qsTr("Person"), qsTr("Hand"), qsTr("Whiteboard"), qsTr("Desk")][cam.values.mode] || "")
-                  : cam.trackingPaused ? qsTr("Tracking paused") : qsTr("Tracking off")
+            dotColor: Cam.values.mode !== 0 ? Theme.ledBlue : Cam.trackingPaused ? Theme.warning : "#6b7a8f"
+            readonly property string view: qsTr("%1° · %2×").arg([86, 78, 65][Math.max(0, Math.min(2, Cam.values.fov))])
+                                                           .arg((1 + ((Cam.ranges.zoomMax || 4) - 1) * Cam.values.zoom / 100).toFixed(1))
+            text: (Cam.values.mode !== 0
+                  ? qsTr("Tracking: %1").arg(["", qsTr("Group"), qsTr("Person"), qsTr("Hand"), qsTr("Whiteboard"), qsTr("Desk")][Cam.values.mode] || "")
+                  : Cam.trackingPaused ? qsTr("Tracking paused") : qsTr("Tracking off")) + "  ·  " + view
         }
         Item { Layout.fillWidth: true }
         Rectangle { // preview bar
@@ -329,15 +407,15 @@ Rectangle {
                 }
                 BarIcon {
                     iconName: "grid"
-                    active: cam.values.showGrid
-                    tip: cam.values.showGrid ? qsTr("Hide the framing grid") : qsTr("Show a rule-of-thirds grid")
-                    onClicked: cam.set("showGrid", !cam.values.showGrid)
+                    active: Cam.values.showGrid
+                    tip: Cam.values.showGrid ? qsTr("Hide the framing grid") : qsTr("Show a rule-of-thirds grid")
+                    onClicked: Cam.set("showGrid", !Cam.values.showGrid)
                 }
                 BarIcon {
-                    iconName: cam.values.previewEnabled ? "eye" : "eye-off"
-                    active: !cam.values.previewEnabled
-                    tip: cam.values.previewEnabled ? qsTr("Turn the preview off (frees the camera's video for other apps)") : qsTr("Turn the preview on")
-                    onClicked: cam.set("previewEnabled", !cam.values.previewEnabled)
+                    iconName: Cam.values.previewEnabled ? "eye" : "eye-off"
+                    active: !Cam.values.previewEnabled
+                    tip: Cam.values.previewEnabled ? qsTr("Turn the preview off (frees the camera's video for other apps)") : qsTr("Turn the preview on")
+                    onClicked: Cam.set("previewEnabled", !Cam.values.previewEnabled)
                 }
             }
         }
@@ -354,7 +432,7 @@ Rectangle {
                 required property int index
                 required property var modelData
                 text: (root.choice === modelData.key ? "✓  " : "     ") + modelData.label
-                onTriggered: cam.set("previewChoice", modelData.key)
+                onTriggered: Cam.set("previewChoice", modelData.key)
             }
             onObjectAdded: (index, object) => qualityMenu.insertItem(index, object)
             onObjectRemoved: (index, object) => qualityMenu.removeItem(object)
@@ -366,35 +444,60 @@ Rectangle {
         }
     }
 
-    // Asleep.
+    // Asleep: wake it, and choose what the camera shows meanwhile.
     Rectangle {
+        z: 4 // covers everything else on the picture
         anchors.fill: parent
-        color: Qt.rgba(0.02, 0.02, 0.025, 0.92)
+        color: Qt.rgba(0.02, 0.03, 0.04, 0.94)
         visible: opacity > 0
-        opacity: cam.values.asleep ? 1 : 0
+        opacity: Cam.values.asleep ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.normal } }
         ColumnLayout {
             anchors.centerIn: parent
+            width: Math.min(parent.width - 48, 480)
             spacing: 12
-            Icon { Layout.alignment: Qt.AlignHCenter; name: "moon"; size: 30; color: "#9aa6b8"; stroke: 1.8 }
-            Text {
+            Rectangle {
                 Layout.alignment: Qt.AlignHCenter
-                text: qsTr("Camera is asleep")
+                implicitWidth: 60
+                implicitHeight: 60
+                radius: 30
+                color: Qt.rgba(0.753, 0.518, 0.988, 0.14)
+                border.color: Qt.rgba(0.753, 0.518, 0.988, 0.35)
+                Icon { anchors.centerIn: parent; name: "moon"; size: 28; color: "#c084fc"; stroke: 1.8 }
+            }
+            Text {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                text: qsTr("The camera is asleep")
                 color: "#e8edf4"
+                font.family: Theme.displayFont
+                font.pixelSize: 22
+            }
+            Text {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                text: qsTr("It has turned away and stopped tracking. Wake it to get the picture and tracking back. Shortcut: Ctrl+L.")
+                color: "#9aa6b8"
                 font.family: Theme.font
-                font.pixelSize: Theme.large
-                font.weight: Font.DemiBold
+                font.pixelSize: Theme.fontSize
             }
             Btn {
                 Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: 4
                 variant: "primary"
-                pill: true
-                text: qsTr("Wake up")
-                onClicked: cam.set("asleep", false)
+                glow: true
+                text: qsTr("Wake camera")
+                onClicked: Cam.set("asleep", false)
+            }
+            SleepPicturePicker {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: 10
+                onVideo: true
+                visible: Cam.values.hasSleepPicture // only when the camera is set to show a picture
             }
         }
     }
-
     // Floating tracking-mode dock. Choosing a mode turns tracking on; the
     // Tracking switch turns it off. While off, the mode it will use is shown
     // faded.
@@ -403,20 +506,20 @@ Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 16
-        visible: !cam.values.asleep && !pointer.steering
+        visible: !Cam.values.asleep && !pointer.steering && !root.zoneEditing
         onVideo: true
         pill: true
         itemHeight: 38
         readonly property var modes: [2, 1, 3, 5, 4]
-        readonly property bool on: cam.values.mode !== 0
+        readonly property bool on: Cam.values.mode !== 0
         options: [qsTr("Person"), qsTr("Group"), qsTr("Hand"), qsTr("Desk"), qsTr("Whiteboard")]
         tips: [qsTr("Follow one person"), qsTr("Keep everyone in the picture"), qsTr("Follow your raised hand"),
                qsTr("Look down at your desk"), qsTr("Frame a whiteboard")]
         accessibleName: qsTr("Tracking mode")
-        currentIndex: modes.indexOf(on ? cam.values.mode : cam.values.lastTrackingMode)
+        currentIndex: modes.indexOf(on ? Cam.values.mode : Cam.values.lastTrackingMode)
         opacity: on ? 1 : 0.72
-        onActivated: (i) => cam.set("mode", modes[i])
-        enabled: cam.connected
+        onActivated: (i) => Cam.set("mode", modes[i])
+        enabled: Cam.connected
     }
 
     component BarIcon: AbstractButton {

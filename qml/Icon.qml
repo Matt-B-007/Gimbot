@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 import QtQuick
-import QtQuick.Shapes
 
 // Line icons drawn from SVG paths on a 24-unit grid, colored by `color`.
 Item {
@@ -65,25 +64,12 @@ Item {
     // layer never has to be switched off and on (doing that to a live shape
     // could crash Qt's shape renderer).
     Loader {
+        id: loader
         active: root.visible
-        sourceComponent: Shape {
-            width: 24
-            height: 24
-            scale: root.size / 24
-            transformOrigin: Item.TopLeft
-            // Render into a texture: smooth edges on the GPU, and correct
-            // clipping inside scroll areas.
-            layer.enabled: true
-            layer.samples: 4
-            layer.smooth: true
-            ShapePath {
-                strokeColor: root.color
-                strokeWidth: root.stroke
-                fillColor: "transparent"
-                capStyle: ShapePath.RoundCap
-                joinStyle: ShapePath.RoundJoin
-                PathSvg { path: root.paths[root.name] || "" }
-            }
-        }
+        source: "IconShape.qml" // its own file: an inline component here trips a Qt 6.4 bug
     }
+    Binding { target: loader.item; property: "scale"; value: root.size / 24; when: loader.item !== null }
+    Binding { target: loader.item; property: "color"; value: root.color; when: loader.item !== null }
+    Binding { target: loader.item; property: "stroke"; value: root.stroke; when: loader.item !== null }
+    Binding { target: loader.item; property: "path"; value: root.paths[root.name] || ""; when: loader.item !== null }
 }

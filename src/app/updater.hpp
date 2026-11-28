@@ -13,12 +13,24 @@
 #include <QObject>
 #include <QProcess>
 #include <QTimer>
+#include <QtQml/qqmlregistration.h>
 
 #include <functional>
+
+class QQmlEngine;
+class QJSEngine;
 
 class Updater : public QObject
 {
     Q_OBJECT
+    // QML sees the app's single instance as `Updater` (see qmlsingletons.cpp).
+    QML_NAMED_ELEMENT(Updater)
+    QML_SINGLETON
+
+public:
+    static Updater *create(QQmlEngine *, QJSEngine *);
+
+private:
     Q_PROPERTY(bool configured READ configured CONSTANT)
     Q_PROPERTY(QString state READ state NOTIFY changed) // idle checking upToDate available error off
     Q_PROPERTY(QString latestVersion READ latestVersion NOTIFY changed)

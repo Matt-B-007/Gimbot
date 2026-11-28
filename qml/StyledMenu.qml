@@ -6,12 +6,21 @@ import QtQuick.Controls
 Menu {
     id: menu
     padding: 4
+    // As wide as its longest entry, so nothing is cut off.
+    width: {
+        let w = 220
+        for (let i = 0; i < count; ++i) {
+            const it = itemAt(i)
+            if (it && it.visible) w = Math.max(w, it.implicitWidth)
+        }
+        return w + leftPadding + rightPadding
+    }
     font.family: Theme.font
     font.pixelSize: Theme.fontSize
     delegate: MenuItem {
         id: item
         implicitHeight: 34
-        implicitWidth: 220
+        implicitWidth: Math.max(220, contentItem.implicitWidth + leftPadding + rightPadding + 8)
         contentItem: Text {
             leftPadding: 8
             text: item.text

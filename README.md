@@ -43,14 +43,17 @@ curl -fsSL https://raw.githubusercontent.com/Matt-B-007/Gimbot/main/install.sh |
 
 ## What it does
 
-- **Live preview** at the sharpest quality for your window: click anywhere to point the camera there, press and drag to steer, scroll to zoom, framing grid
+- **Live preview** at the sharpest quality for your window (or pick one from the quality menu): double-click anywhere to point the camera there, press and drag to steer, scroll to zoom, framing grid. While tracking, a blue frame and dot match the camera's own light
 - **Tracking switch** on the main screen, plus person (full body, upper body, close-up), group, hand, desk and whiteboard modes, field of view and style. Moving the camera by hand pauses tracking with a clear **Resume** button (or resume automatically)
-- **Smooth movement**: Fast, Normal, Smooth or Cinematic glides for click-to-aim, the dial, presets (angle and zoom together) and eased arrow keys
-- **Aim dial**: shows where the camera points, live; click or drag to aim. Up is up and right is right everywhere, with a two-step direction check if your camera disagrees
+- **Smooth movement**: Fast, Normal, Smooth or Cinematic glides for double-click aiming, presets (angle and zoom together) and eased arrow keys
+- **Aim pad**: drag the circle to move (a little is slow, to the edge is fast; let go to stop), with the live angle beside it. Up is up and right is right everywhere, with a two-step direction check if your camera disagrees
 - **Main screen** has what you change during a call: white balance chips, focus and exposure (auto/manual), gestures, voice commands, tracking area, a profile switcher and a status line that says what the camera is doing and how to fix problems
-- **Presets** with thumbnails, Ctrl+1–9, rename/update/delete, drag to reorder, and pick which one the camera starts at
+- **Presets** with thumbnails, Ctrl+1–3 (the camera holds three), rename/update/delete from a right-click menu, drag to reorder, and pick which one the camera starts at
+- **Tracking area drawn on the picture**: drag its corners, or the ends of a bar showing the whole turning range for areas wider than the picture
+- **Camera states** with a clear next step: no camera, another app using the video, asleep (with the sleep picture choice), preview off
+- **Status light level** (Off, 1–3) shown on the main screen; the SDK can read it but not change it
 - **Quick controls**: zoom buttons (1×, 2×, max), a sleep timer next to the Sleep button, anti-flicker and hue under Image, and every shortcut on one page (press `?`)
-- **Every Tiny 2 setting in the SDK**: tracking area, startup position and mode, sleep timer, microphone during sleep, automatic mic volume, voice commands and language, field of view, exposure/shutter, focus, white balance presets and temperature, brightness/contrast/saturation/sharpness/hue, anti-flicker, HDR, mirror, zoom speed, gestures, reverse pan, guide light, factory reset
+- **Every Tiny 2 setting in the SDK**, in seven groups: tracking area, startup position and mode, sleep timer, sleep picture, microphone during sleep, automatic mic volume, voice commands and language, field of view, exposure/shutter, focus, white balance presets and temperature, brightness/contrast/saturation/sharpness/hue, anti-flicker, HDR, mirror, zoom speed, gestures, reverse pan, guide light, factory reset
 - **Profiles**: save whole setups ("Meetings", "Streaming"), switch in one click, import/export
 - **Automatic camera detection**: plug in and it connects; unplug and it waits
 - **Ctrl+K command search**, light/dark theme, optional Plasma accent color
@@ -138,4 +141,4 @@ What changed in each version: [CHANGELOG.md](CHANGELOG.md).
 ## License
 
 MIT for Gimbot's own code. The OBSBOT SDK belongs to Remo Tech and is not
-covered. Inter typeface: SIL Open Font License.
+covered. Inter and Space Grotesk typefaces: SIL Open Font License.
